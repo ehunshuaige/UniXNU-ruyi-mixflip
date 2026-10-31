@@ -1,6 +1,6 @@
 # XNU patches for this board and profile.
 #
-# All three are compatibility fixes for building xnu-8796 with a current Xcode,
+# All four are compatibility fixes for building xnu-8796 with a current Xcode,
 # not behaviour changes. They are device-local copies because the shared
 # arch/soc/os series targets xnu-10063; each hunk applies unchanged to
 # xnu-8796's sources.
@@ -27,3 +27,11 @@ drop-trivial-auto-var-init-acknowledgement.patch
 # A matching generator cannot be built: XNU does not publish iig's source, so
 # this backports the one field newer XNU has, with the same guard and type.
 backport-iorpc-kernel-content.patch
+
+# A char array element whose size is not a multiple of its alignment is now a
+# hard error in clang, and the stack buffers uio_createwithbuffer() fills were
+# declared as `uio_stackbuf_t buf[UIO_SIZEOF(n)]` where the element type is an
+# aligned char. The declarations now name the alignment themselves, which keeps
+# the buffer size exact; widening the element instead would multiply every such
+# buffer on the stack by the alignment.
+align-uio-stackbuf-declarations.patch
