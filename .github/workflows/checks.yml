@@ -20,7 +20,11 @@ jobs:
       - name: Fetch the UniXNU build driver
         uses: actions/checkout@v4
         with:
-          repository: UniXNU/UniXNU
+          # The fork branch, not upstream main: the ios-16.7.16-20H392 OS profile
+          # this repository selects lives there. Checking out upstream would fail
+          # resolution with "missing file .../profiles/os/ios-16.7.16-20H392".
+          repository: ehunshuaige/UniXNU
+          ref: ruyi-format2
           path: .unixnu
 
       - name: Scope rules (no GPU driver, no cover display)
