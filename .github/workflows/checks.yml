@@ -29,13 +29,20 @@ jobs:
       - name: Hardware tree and ADT
         run: python3 scripts/check-tree.py --unixnu .unixnu --device .
 
+      - name: Pin lengths (a truncated sha256 never matches)
+        run: python3 scripts/check-pins.py
+
       - name: Porting record
         run: python3 .unixnu/scripts/porting-record.py check --device .
 
-      - name: The display builder must refuse to build until the ABI audit exists
+      - name: The display builder must verify the ABI audit and then refuse
         run: |
+          # It must fail (the object size and backend leaves are still missing)...
           if python3 scripts/build-gop-legacy-display.py 2>/dev/null; then
-            echo "the display builder succeeded, but the iOS 16 ABI audit is not committed"
+            echo "the display builder succeeded, but its remaining inputs are not implemented"
             exit 1
           fi
-          echo "display builder correctly refuses: the 20H392 ABI audit is missing"
+          # ...but only AFTER accepting the committed audit, not because it is absent.
+          python3 scripts/build-gop-legacy-display.py 2>&1 | grep -q "ABI audit verified" \
+            || { echo "the display builder rejected the committed ABI audit"; exit 1; }
+          echo "display builder verified the audit and correctly refuses to emit an archive"

@@ -108,7 +108,7 @@ kernel = "build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.u
 #   arm64 slice     2ec297ba...  (50937856 bytes)
 # This is the value the prelink step must reproduce; it is a property of the
 # Apple kernelcache, not of ruyi hardware, so it is safe to pin exactly.
-kernelcache_sha256 = "2ec297bac95bcba01046fd0148e97e7e588c05a6c18827f39f534ba375c1221"
+kernelcache_sha256 = "2ec297bac95bcba01046fd0148e97e7e5885c05a6c18827f39f534ba375c1221"
 slide = "-0x1000000"
 # No early_security_init line: AMFI's early initializer panics with
 # "AMFI: No PMGR?" unless an ApplePMGRNub provider exists, and this profile
