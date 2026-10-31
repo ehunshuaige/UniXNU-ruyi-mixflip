@@ -12,6 +12,7 @@ This check is cheap and catches that class of mistake before it reaches a build.
     python3 scripts/check-pins.py
 """
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -21,7 +22,7 @@ REPO = HERE.parent
 # Files that carry pins. Evidence prose is included on purpose: a wrong hash
 # quoted in documentation is just as misleading as one in a config.
 SUFFIXES = {".toml", ".json", ".md", ".py", ".log"}
-SKIP_DIRS = {".git", "out", "build", "__pycache__"}
+SKIP_DIRS = {".git", "out", "build", "__pycache__", ".unixnu", "tools"}
 SKIP_FILES = {"scripts/check-pins.py"}
 
 # A hex run of 40..80 characters that is not part of a longer word.
@@ -33,11 +34,29 @@ EXPECTED = {40, 64, 96}
 problems = []
 
 
+def tracked_files():
+    """The files this repository owns, via git.
+
+    Walking the directory would also read sibling checkouts that CI places next
+    to it (`.unixnu`, `tools`), and those legitimately contain long hex runs that
+    are constants, not pins. git ls-files is exactly the repository's own set.
+    """
+    try:
+        result = subprocess.run(["git", "-C", str(REPO), "ls-files", "-z"],
+                                capture_output=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return sorted(REPO.rglob("*"))
+    return [REPO / name for name in result.stdout.decode().split("\0") if name]
+
+
 def main():
-    for path in sorted(REPO.rglob("*")):
+    for path in tracked_files():
         if not path.is_file():
             continue
-        rel = path.relative_to(REPO)
+        try:
+            rel = path.relative_to(REPO)
+        except ValueError:
+            continue
         if any(part in SKIP_DIRS for part in rel.parts):
             continue
         if rel.as_posix() in SKIP_FILES:
