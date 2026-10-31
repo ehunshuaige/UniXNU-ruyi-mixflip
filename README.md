@@ -118,6 +118,69 @@ python3 scripts/check-scope.py                       # no GPU driver, no cover d
 python3 ../UniXNU/scripts/porting-record.py check --device .
 ```
 
+## Continuous integration
+
+Two workflows, both free: this repository is public, so GitHub-hosted runner
+minutes do not count against any quota.
+
+| Workflow | Runner | Trigger | What it proves |
+| --- | --- | --- | --- |
+| `checks.yml` | `ubuntu-24.04` | push, pull request, manual | the host-side invariants (below) |
+| `kernel.yml` | `macos-26` | manual only | the kernel actually builds and prelinks for this profile |
+
+### Repository checks
+
+Every push runs, with no device and no Apple input:
+
+```
+check-scope.py       no GPU component, no cover-display node
+check-pins.py        no truncated sha256 pin
+check-defconfig.py   the merged arch/SoC/OS/device configuration is sane
+check-tree.py        board DTS compiles, ADT generates, values are consistent
+porting-record.py    13 structured areas, and changes touch their owning area
+build-gop-legacy-display.py   verifies the display ABI audit, then refuses
+check-firmware.py    ruyiPkg DSC/FDF payload wiring (skipped unless a checkout is supplied)
+```
+
+Run them by hand with:
+
+```sh
+gh workflow run checks.yml --repo OWNER/UniXNU-ruyi-mixflip
+```
+
+### Kernel build
+
+`kernel.yml` is manual because it is expensive and because its inputs (IPSW,
+Xcode) change rarely:
+
+```sh
+gh workflow run kernel.yml --repo OWNER/UniXNU-ruyi-mixflip \
+  -f steps=kernel -f xcode=26.6 -f unixnu_ref=ruyi-format2
+```
+
+It checks out this repository as `device/` and the UniXNU fork branch as
+`unixnu/`, resolves `ruyi_defconfig`, builds the kernel, and uploads **text logs
+only**. The kernel, payload and kernelcache derive from Apple software and are
+never published, not even as artifacts.
+
+One workaround is visible in that workflow and worth knowing about:
+`xnu-8796` (this profile) generates `bsd/sys/_symbol_aliasing.h` with
+`bsd/sys/make_symbol_aliasing.sh`, which requires
+`${SDKROOT}/usr/local/libexec/availability.pl` and fails the build without it.
+The xnu-10063 tree the UniXNU build driver targets instead honours an
+`XNU_AVAILABILITY_PL` environment variable, so the driver only installs that file
+into its own fakeroot. The workflow installs it into the macOS and iPhoneOS SDKs
+before building.
+
+### Why the kernel workflow lives here
+
+GitHub does not run workflows on a fork of a public repository until the owner
+enables them in the Actions tab, and the REST API cannot grant that
+(`PUT /actions/permissions` reports success but dispatch still returns
+`422 Actions has been disabled for this repository`). A workflow in this
+repository can still check out the fork, so the build runs here and the UniXNU
+source stays in its own repository.
+
 ## Evidence discipline
 
 Every hardware constant in `board.toml` and `dts/ruyi.dts` is traceable to either
