@@ -126,21 +126,59 @@ jobs:
           # value ('RUYI' + 1), not a device ECID: it only seeds IOPlatformUUID.
           echo "value=0x5357454554000001" >> "$GITHUB_OUTPUT"
 
+      - name: Provide availability.pl to the macOS SDK
+        run: |
+          # xnu-8796 generates bsd/sys/_symbol_aliasing.h with
+          # bsd/sys/make_symbol_aliasing.sh, which looks for
+          #   ${SDKROOT}/${DRIVERKITROOT}/usr/local/libexec/availability.pl
+          # and fails the whole installhdrs pass if it is absent. The xnu-10063
+          # tree the UniXNU build driver targets instead honours an
+          # XNU_AVAILABILITY_PL environment variable, which is why the driver
+          # only installs the file into its own fakeroot. This profile runs
+          # xnu-8796, so the file has to exist under the SDK the build uses.
+          SDK="$(xcrun --sdk macosx --show-sdk-path)"
+          if [ -x "$SDK/usr/local/libexec/availability.pl" ]; then
+            echo "already present: $SDK/usr/local/libexec/availability.pl"
+            exit 0
+          fi
+          git clone -q --depth 1 --branch "${AVAILABILITY_TAG:-AvailabilityVersions-141.1}" \
+            https://github.com/apple-oss-distributions/AvailabilityVersions.git "$RUNNER_TEMP/av"
+          make -C "$RUNNER_TEMP/av" install -j"$(sysctl -n hw.ncpu)" \
+            OBJROOT="$RUNNER_TEMP/av-build" SYMROOT="$RUNNER_TEMP/av-build" \
+            DSTROOT="$RUNNER_TEMP/av-root" \
+            CMAKE="$(command -v cmake)" NINJA="$(command -v ninja)"
+          sudo mkdir -p "$SDK/usr/local/libexec"
+          sudo install -m 755 "$RUNNER_TEMP/av-root/usr/local/libexec/availability.pl" \
+            "$SDK/usr/local/libexec/availability.pl"
+          ls -l "$SDK/usr/local/libexec/availability.pl"
+
       - name: Select the device
         working-directory: unixnu
         run: |
           ./unixnu defconfig "$DEFCONFIG"
-          ./unixnu status --json > "$RUNNER_TEMP/status.json" || true
+          ./unixnu status --json > "$RUNNER_TEMP/status.json" 2>/dev/null || true
           python3 - "$RUNNER_TEMP/status.json" <<'PY' || true
           import json, sys
           from pathlib import Path
           path = Path(sys.argv[1])
           if not path.is_file():
               raise SystemExit(0)
-          data = json.loads(path.read_text() or '{}')
-          print('resolved device :', data.get('device'))
-          print('components      :', ', '.join(data.get('components') or []))
-          print('out             :', data.get('out'))
+          try:
+              data = json.loads(path.read_text() or '{}')
+          except ValueError:
+              raise SystemExit(0)
+          def text(value):
+              if isinstance(value, str):
+                  return value
+              if isinstance(value, dict):
+                  return value.get('name') or value.get('id') or ''
+              return ''
+          print('resolved device :', text(data.get('device')) or data.get('device'))
+          groups = data.get('components')
+          if isinstance(groups, list):
+              names = [text(item) for item in groups]
+              print('components      :', ', '.join(n for n in names if n))
+          print('out             :', text(data.get('out')))
           PY
 
       - name: Build kernel
@@ -160,18 +198,17 @@ jobs:
         if: always()
         run: |
           echo "## ruyi kernel build"
+          set +e
           find unixnu/out -maxdepth 4 -type d 2>/dev/null | head -30
           echo
-          find unixnu/out -name 'kernel.macho' -o -name 'kernel.macho.adt' 2>/dev/null | while read -r f; do
-            printf '%s  %s bytes\n' "$f" "$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f")"
-          done
-          echo
           python3 - <<'PY' || true
-          import hashlib, os
+          import hashlib
           from pathlib import Path
+          root = Path('unixnu/out')
           for name in ('kernel.macho', 'kernel.macho.adt'):
-              for path in Path('unixnu/out').rglob(name):
-                  print(name, hashlib.sha256(path.read_bytes()).hexdigest(), path)
+              for path in sorted(root.rglob(name)) if root.is_dir() else []:
+                  print(name, path.stat().st_size, 'bytes',
+                        hashlib.sha256(path.read_bytes()).hexdigest(), path)
           PY
 
       - name: Collect the text logs
