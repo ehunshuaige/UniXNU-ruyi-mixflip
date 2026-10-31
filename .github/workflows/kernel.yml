@@ -131,26 +131,39 @@ jobs:
           # xnu-8796 generates bsd/sys/_symbol_aliasing.h with
           # bsd/sys/make_symbol_aliasing.sh, which looks for
           #   ${SDKROOT}/${DRIVERKITROOT}/usr/local/libexec/availability.pl
-          # and fails the whole installhdrs pass if it is absent. The xnu-10063
-          # tree the UniXNU build driver targets instead honours an
-          # XNU_AVAILABILITY_PL environment variable, which is why the driver
-          # only installs the file into its own fakeroot. This profile runs
-          # xnu-8796, so the file has to exist under the SDK the build uses.
-          SDK="$(xcrun --sdk macosx --show-sdk-path)"
-          if [ -x "$SDK/usr/local/libexec/availability.pl" ]; then
-            echo "already present: $SDK/usr/local/libexec/availability.pl"
-            exit 0
-          fi
+          # and fails the build if it is absent. The xnu-10063 tree the UniXNU
+          # build driver targets instead honours an XNU_AVAILABILITY_PL
+          # environment variable, which is why the driver only installs the file
+          # into its own fakeroot. This profile runs xnu-8796, so the file has to
+          # exist under the SDK the build uses.
+          # Two SDKs are involved: installhdrs runs with SDKROOT=macosx and the
+          # kernel build runs with SDKROOT=iphoneos, so both need the file.
           git clone -q --depth 1 --branch "${AVAILABILITY_TAG:-AvailabilityVersions-141.1}" \
             https://github.com/apple-oss-distributions/AvailabilityVersions.git "$RUNNER_TEMP/av"
           make -C "$RUNNER_TEMP/av" install -j"$(sysctl -n hw.ncpu)" \
             OBJROOT="$RUNNER_TEMP/av-build" SYMROOT="$RUNNER_TEMP/av-build" \
             DSTROOT="$RUNNER_TEMP/av-root" \
             CMAKE="$(command -v cmake)" NINJA="$(command -v ninja)"
-          sudo mkdir -p "$SDK/usr/local/libexec"
-          sudo install -m 755 "$RUNNER_TEMP/av-root/usr/local/libexec/availability.pl" \
-            "$SDK/usr/local/libexec/availability.pl"
-          ls -l "$SDK/usr/local/libexec/availability.pl"
+          built="$RUNNER_TEMP/av-root/usr/local/libexec/availability.pl"
+          [ -x "$built" ] || { echo "::error::availability.pl was not built"; exit 1; }
+          missing=0
+          for sdk_name in macosx iphoneos; do
+            sdk="$(xcrun --sdk "$sdk_name" --show-sdk-path 2>/dev/null || true)"
+            [ -n "$sdk" ] || { echo "no $sdk_name SDK"; continue; }
+            if [ -x "$sdk/usr/local/libexec/availability.pl" ]; then
+              echo "already present in $sdk_name"
+              continue
+            fi
+            sudo mkdir -p "$sdk/usr/local/libexec"
+            sudo install -m 755 "$built" "$sdk/usr/local/libexec/availability.pl"
+            echo "installed into $sdk_name: $sdk/usr/local/libexec/availability.pl"
+            missing=1
+          done
+          for sdk_name in macosx iphoneos; do
+            sdk="$(xcrun --sdk "$sdk_name" --show-sdk-path 2>/dev/null || true)"
+            [ -n "$sdk" ] && ls -l "$sdk/usr/local/libexec/availability.pl"
+          done
+          exit 0
 
       - name: Select the device
         working-directory: unixnu
