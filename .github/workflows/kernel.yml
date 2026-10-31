@@ -185,55 +185,54 @@ jobs:
         run: |
           set -euo pipefail
           # xnu compiles with -I$(SDKROOT)/usr/local/include/kernel
-          # (makedefs/MakeInc.def: INCFLAGS_SDK). On Linux the build driver answers
-          # every xcrun --sdk query with its own fakeroot, where it has already
-          # unifdef'd libdispatch's os/ headers; on macOS SDKROOT resolves to the
-          # real SDK, which has no usr/local/include/kernel at all, so
-          # <os/firehose_buffer_private.h> and its siblings are simply not on the
-          # search path.
+          # (makedefs/MakeInc.def: INCFLAGS_SDK). On Linux the build driver
+          # answers every xcrun --sdk query with its own fakeroot, so that path
+          # lands inside the fakeroot; on macOS SDKROOT resolves to the real
+          # SDK, which has no usr/local/include/kernel at all. The fakeroot copy
+          # is made and is correct - the diagnostic step shows
+          # <os/firehose_buffer_private.h> sitting in it - it is simply never
+          # searched.
           #
           # The runner is disposable, so mirror what a Kernel Development Kit
-          # provides: unifdef the pinned libdispatch os/ headers into the SDK.
-          {
-            cd unixnu
-            ./unixnu fetch
-            feed=$(ls -d out/feeds/libdispatch-* 2>/dev/null | head -1)
-            [ -n "$feed" ] || { echo "::error::libdispatch feed missing"; exit 1; }
-            sdk=$(xcrun --sdk iphoneos --show-sdk-path)
-            dest="$sdk/usr/local/include/kernel/os"
-            sudo mkdir -p "$dest"
-            count=0
-            for header in "$feed"/os/*.h; do
-              name=$(basename "$header")
-              if unifdef -DKERNEL=1 -DOS_FIREHOSE_SPI=1 \
-                   -DOS_VOUCHER_ACTIVITY_SPI_TYPES=1 -UOS_VOUCHER_ACTIVITY_SPI \
-                   "$header" > "$RUNNER_TEMP/$name"; then
-                :
-              else
-                rc=$?
-                [ "$rc" -eq 1 ] || { echo "skip $name (unifdef rc=$rc)"; continue; }
-              fi
-              sudo install -m 644 "$RUNNER_TEMP/$name" "$dest/$name"
-              count=$((count + 1))
-            done
-            echo "installed $count os/ headers into $dest"
-            ls "$dest" | head -25
-
-            # INCFLAGS_PLATFORM points at PrivateHeaders/platform, which is the
-            # other SDK directory the compile reports missing. The build driver
-            # fills it in its fakeroot; on macOS it has to be filled here.
-            plat=$(ls -d out/feeds/libplatform-* 2>/dev/null | head -1)
-            [ -n "$plat" ] || { echo "::error::libplatform feed missing"; exit 1; }
-            pdir="$sdk/System/Library/Frameworks/Kernel.framework/Versions/A/PrivateHeaders/platform"
-            if [ -d "$plat/private/platform" ]; then
-              sudo mkdir -p "$pdir"
-              sudo cp -R "$plat/private/platform/." "$pdir/"
-              echo "installed platform headers into $pdir"
-              ls "$pdir" | head -10
+          # provides: build the same os/ header set the driver builds, and put it
+          # where the compiler looks.
+          cd unixnu
+          ./unixnu fetch
+          dispatch=$(ls -d out/feeds/libdispatch-* 2>/dev/null | head -1)
+          platform=$(ls -d out/feeds/libplatform-* 2>/dev/null | head -1)
+          [ -n "$dispatch" ] || { echo "::error::libdispatch feed missing"; exit 1; }
+          [ -n "$platform" ] || { echo "::error::libplatform feed missing"; exit 1; }
+          stage="$RUNNER_TEMP/os-stage"
+          rm -rf "$stage"; mkdir -p "$stage"
+          # libplatform contributes most of the set (atomic/lock/log internals).
+          for tree in "$platform/include" "$platform/private"; do
+            [ -d "$tree/os" ] && cp -R "$tree/os/." "$stage/"
+          done
+          # libdispatch contributes the SPI headers, unifdef'd for the kernel
+          # exactly as build-xnu-4k-baseline.sh does.
+          count=0
+          for header in "$dispatch"/os/*.h; do
+            name=$(basename "$header")
+            if unifdef -DKERNEL=1 -DOS_FIREHOSE_SPI=1 \
+                 -DOS_VOUCHER_ACTIVITY_SPI_TYPES=1 -UOS_VOUCHER_ACTIVITY_SPI \
+                 "$header" > "$stage/$name"; then
+              :
             else
-              echo "no private/platform in the libplatform feed"
+              rc=$?
+              [ "$rc" -eq 1 ] || { echo "skip $name (unifdef rc=$rc)"; continue; }
             fi
-          }
+            count=$((count + 1))
+          done
+          echo "staged $(ls "$stage" | wc -l) os/ headers ($count from libdispatch)"
+          sdk=$(xcrun --sdk iphoneos --show-sdk-path)
+          # Both layouts a kernel SDK uses are cheap to satisfy, and the exact
+          # one xnu resolves is not worth guessing.
+          for dest in "$sdk/usr/local/include/kernel/os" "$sdk/usr/local/include/os"; do
+            sudo mkdir -p "$dest"
+            sudo cp -R "$stage/." "$dest/"
+            echo "installed into $dest"
+          done
+          ls "$sdk/usr/local/include/kernel/os" | head -8
 
       - name: Build kernel
         working-directory: unixnu
