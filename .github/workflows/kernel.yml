@@ -138,10 +138,19 @@ jobs:
           #   drop-trivial-auto-var-init-acknowledgement.patch  current clang
           #     rejects Apple's acknowledgement flag for the experimental
           #     -ftrivial-auto-var-init feature as an unknown argument.
+          #   backport-iorpc-kernel-content.patch  the SDK's iig emits IORPC
+          #     initialisers setting kernelContent, which xnu-8796's IORPC
+          #     lacks; XNU does not publish iig's source, so the field that
+          #     newer XNU has is backported instead.
           #
           # No SDK mutation is needed: the driver installs availability.pl into
           # its own fakeroot and the patch redirects the generator there.
           grep -c '^[a-z].*\.patch$' device/patches/xnu/series | xargs echo "device xnu patches:"
+          # Record which generator the SDK supplies, so a future skew is
+          # recognisable from the log alone.
+          IIG="$(xcrun --sdk iphoneos -find iig)"
+          echo "iig: $IIG"
+          "$IIG" --help 2>&1 | head -30 || true
 
       - name: Select the device
         working-directory: unixnu

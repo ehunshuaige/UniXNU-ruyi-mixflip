@@ -1,8 +1,8 @@
 # XNU patches for this board and profile.
 #
-# Both are compatibility fixes for building xnu-8796 with a current Xcode clang,
+# All three are compatibility fixes for building xnu-8796 with a current Xcode,
 # not behaviour changes. They are device-local copies because the shared
-# arch/soc/os series targets xnu-10063; these two hunks apply unchanged to
+# arch/soc/os series targets xnu-10063; each hunk applies unchanged to
 # xnu-8796's sources.
 
 # make_symbol_aliasing.sh looks availability.pl up under ${SDKROOT} in
@@ -19,3 +19,11 @@ local-availability.patch
 # every C and C++ compile. -ftrivial-auto-var-init=zero remains, so the
 # behaviour is unchanged.
 drop-trivial-auto-var-init-acknowledgement.patch
+
+# The iig code generator lives in the SDK (makedefs/MakeInc.cmd resolves it with
+# `xcrun --find iig`), and a current one emits IORPC initialisers that set
+# kernelContent inside #ifdef KERNEL. xnu-8796's IORPC has no such field, so
+# every DriverKit .iig.cpp fails with "no member named 'kernelContent'".
+# A matching generator cannot be built: XNU does not publish iig's source, so
+# this backports the one field newer XNU has, with the same guard and type.
+backport-iorpc-kernel-content.patch
