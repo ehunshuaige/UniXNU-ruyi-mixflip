@@ -35,3 +35,9 @@ backport-iorpc-kernel-content.patch
 # the buffer size exact; widening the element instead would multiply every such
 # buffer on the stack by the alignment.
 align-uio-stackbuf-declarations.patch
+
+# pmap.h declares reserved10 twice when a platform has neither Rosetta nor
+# Apple PAC: once as the CONFIG_ROSETTA fallback and once as the HAS_APPLE_PAC
+# fallback. Apple's own arm64 platforms always have PAC, so upstream never saw
+# it; newer XNU renumbers the second one. This is the same rename.
+rename-pmap-non-pac-padding.patch

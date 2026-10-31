@@ -1,0 +1,16 @@
+diff --git a/osfmk/arm/pmap/pmap.h b/osfmk/arm/pmap/pmap.h
+index df672c6..5237e37 100644
+--- a/osfmk/arm/pmap/pmap.h
++++ b/osfmk/arm/pmap/pmap.h
+@@ -442,7 +442,10 @@ struct pmap {
+ #if HAS_APPLE_PAC
+ 	bool disable_jop;
+ #else
+-	bool reserved10;
++	/* Distinct from the CONFIG_ROSETTA padding above: a platform without
++	 * Apple PAC and without Rosetta would otherwise declare reserved10
++	 * twice, which clang rejects. Newer XNU renumbers this field. */
++	bool reserved10_no_pac;
+ #endif /* HAS_APPLE_PAC */
+ 
+ 	bool reserved11;
