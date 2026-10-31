@@ -1,0 +1,12 @@
+# Copy to local.toml (ignored) and fill in the local build inputs.
+# Relative paths start at this file's directory.
+[build]
+device = "../UniXNU-ruyi"
+uefi = "../uefi-ruyi"
+ipsw = "/path/to/iPhone10,3,iPhone10,6_16.7.16_20H392_Restore.ipsw"
+kernelcache = "/path/to/kernelcache.decompressed"
+trust_cache = "/path/to/trustcache.bundle"
+data_ramdisk = "/path/to/data-seed.dbr"
+unique_chip_id = "<hex>"
+jobs = 8
+target = "DEBUG"

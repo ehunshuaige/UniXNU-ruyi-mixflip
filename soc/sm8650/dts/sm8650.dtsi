@@ -1,0 +1,127 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// SM8650 shared resource slice for the UniXNU ruyi device repository.
+//
+// Board-local, device-versioned; not a claim to an upstream SM8650 common
+// repository (none exists). Only resources that are identical across SM8650
+// parts live here. Board wiring, reservations, panels and power policy stay in
+// the device repository's board DTS.
+//
+// Every address below is read from the ruyi device's own live device tree; the
+// device repository quotes each one in docs/evidence/RUYI-FDT-FACTS.md.
+//
+// NO GPU NODE: there is no Adreno, GMU or GPU SMMU resource here, so a device
+// selecting this slice cannot acquire a GPU driver from the SoC layer.
+
+/ {
+    compatible = "qcom,sm8650";
+    #address-cells = <2>;
+    #size-cells = <2>;
+    interrupt-parent = <&intc>;
+
+    cpus {
+        #address-cells = <2>;
+        #size-cells = <0>;
+        // The vendor tree carries the timebase on /timer; the UniXNU ADT
+        // generator reads it from /cpus, so the same 19.2 MHz value is restated
+        // here. Source: live FDT /timer clock-frequency = 0x124f800.
+        timebase-frequency = <19200000>;
+
+        // SM8650: 2x Cortex-A520 + 5x Cortex-A720 + 1x Cortex-X4.
+        // MPIDR affinities and capacity-dmips-mhz from the live FDT /cpus.
+        cpu0: cpu@0 {
+            device_type = "cpu";
+            compatible = "qcom,kryo";
+            reg = <0x0 0x0>;
+            unixnu,cluster-type = "E";
+        };
+        cpu1: cpu@100 {
+            device_type = "cpu";
+            compatible = "qcom,kryo";
+            reg = <0x0 0x100>;
+            unixnu,cluster-type = "E";
+        };
+        cpu2: cpu@200 {
+            device_type = "cpu";
+            compatible = "qcom,kryo";
+            reg = <0x0 0x200>;
+            unixnu,cluster-type = "P";
+        };
+        cpu3: cpu@300 {
+            device_type = "cpu";
+            compatible = "qcom,kryo";
+            reg = <0x0 0x300>;
+            unixnu,cluster-type = "P";
+        };
+        cpu4: cpu@400 {
+            device_type = "cpu";
+            compatible = "qcom,kryo";
+            reg = <0x0 0x400>;
+            unixnu,cluster-type = "P";
+        };
+        cpu5: cpu@500 {
+            device_type = "cpu";
+            compatible = "qcom,kryo";
+            reg = <0x0 0x500>;
+            unixnu,cluster-type = "P";
+        };
+        cpu6: cpu@600 {
+            device_type = "cpu";
+            compatible = "qcom,kryo";
+            reg = <0x0 0x600>;
+            unixnu,cluster-type = "P";
+        };
+        cpu7: cpu@700 {
+            device_type = "cpu";
+            compatible = "qcom,kryo";
+            reg = <0x0 0x700>;
+            unixnu,cluster-type = "P";
+        };
+    };
+
+    // Live FDT /psci: compatible "arm,psci-1.0", method "smc".
+    psci {
+        compatible = "arm,psci-1.0";
+        method = "smc";
+    };
+
+    soc {
+        compatible = "simple-bus";
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+
+        // Live FDT /soc/interrupt-controller@17100000:
+        //   reg = <0x17100000 0x10000 0x17180000 0x200000>
+        //   redistributor-stride = <0x0 0x40000>
+        // SM8650 is a GICv4 part: four frames (RD + SGI + VLPI + reserved) per
+        // PE. XNU reads the stride from the ADT; the GICv3 default 0x20000 puts
+        // every PE after the first at another PE's redistributor.
+        intc: interrupt-controller@17100000 {
+            compatible = "arm,gic-v3";
+            unixnu,adt-name = "intc";
+            reg = <0x0 0x17100000 0x0 0x10000>, <0x0 0x17180000 0x0 0x200000>;
+            #interrupt-cells = <4>;
+            #address-cells = <0>;
+            interrupt-controller;
+            redistributor-stride = <0x0 0x40000>;
+        };
+
+        // Live FDT /soc/ufshc@1d84000. Only the ufs_mem window is exported: the
+        // driver maps one register window, and exporting the ICE/MCQ ranges
+        // without a driver that uses them only invites wrong assumptions.
+        ufs: ufshc@1d84000 {
+            compatible = "qcom,ufshc";
+            unixnu,adt-name = "ufshc";
+            reg = <0x0 0x1d84000 0x0 0x3000>;
+            status = "disabled";
+        };
+
+        // Live FDT /soc/ufsphy_mem@1d80000.
+        ufsphy: phy@1d80000 {
+            compatible = "qcom,ufs-phy-qmp-v4-pineapple";
+            unixnu,adt-name = "ufsphy";
+            reg = <0x0 0x1d80000 0x0 0x2000>;
+            status = "disabled";
+        };
+    };
+};

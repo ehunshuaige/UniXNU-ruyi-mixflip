@@ -1,0 +1,23 @@
+# Board-local SM8650 resource slice.
+#
+# This is NOT a claim to an upstream shared SM8650 repository: none exists in the
+# UniXNU organisation, and creating one from a single device would be premature.
+# The slice is versioned by this device repository's own commits, exactly as
+# kerrinz/UniXNU-zorn does for the same SoC.
+#
+# It carries only the resources ruyi actually drives and that are identical
+# across SM8650 parts. Board wiring, reservations, peripherals and power policy
+# stay in the device repository's board DTS and board.toml.
+#
+# Provenance of every address here: the ruyi live device tree, quoted in
+# docs/evidence/RUYI-FDT-FACTS.md. The values are also the SM8650 register map,
+# but that is a cross-check, not the source.
+
+[soc]
+name = "SM8650"
+description = "SM8650 non-GPU resource slice for ruyi; device-versioned, not a complete shared SoC implementation"
+
+# No GPU component. This slice describes a CPU/timer/interrupt/UFS map only, so
+# a device that selects it cannot acquire a GPU driver through the SoC layer.
+[components]
+include = ["ArmCpu", "ArmDTPlatform"]
