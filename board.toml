@@ -80,7 +80,7 @@ include = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink", "GopFramebuff
 
 [kernel]
 defconfig = "ruyi_defconfig"
-config_fragments = ["arch:configs/common.config", "soc:configs/sm8650.config", "os:configs/ipados.config"]
+config_fragments = ["arch:configs/common.config", "soc:configs/sm8650.config", "os:configs/ios.config"]
 # Device series only. The shared arch/soc/os series in this UniXNU snapshot
 # target xnu-10063.141.1 (the iPadOS 17 profile), while this port runs xnu-8796
 # (Darwin 22). Referencing them makes `unixnu status` abort with "patch missing"

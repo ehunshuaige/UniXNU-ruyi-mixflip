@@ -42,6 +42,7 @@ procedure = [
 ]
 findings = [
   "Format 2 merges tables in arch, SoC, OS, device order and replaces ordinary arrays. There is no UniXNU-sm8650-common repository, so board.soc_source names a board-local slice (feeds.toml kind = soc, local = soc/sm8650), the same arrangement kerrinz/UniXNU-zorn uses. The slice holds SoC resources; board wiring, reservations and the panel stay in dts/ruyi.dts.",
+  "The iOS 16 OS profile needed its own kernel config fragment: [kernel] config_fragments referenced os:configs/ipados.config, which exists only in the iPadOS profile. A missing fragment aborts defconfig assembly, and scripts/check-defconfig.py caught it. The profile now carries configs/ios.config.",
   "kernel.patch_series selects only device:patches/xnu/series. The shared arch/soc/os series in this snapshot are written against xnu-10063.141.1 while this port runs xnu-8796, so referencing them would apply hunks to the wrong source; both working SM8650 iOS-16 ports use the single-series form.",
   "The ruyi board was previously described in format 1 against the iPadOS 17.7.11 profile. That profile's kernelcache is a different Apple build from the iOS 16.7.16 one, so its prelink pins cannot be reused: every prelink input here is recomputed from the 20H392 IPSW.",
   "The iOS 16.7.16 kernelcache's IOMobileGraphicsFamily is a different binary from the iPadOS 17 one (executable sha256 03e4c4d8... vs 2e044ee6...), so display ABI facts do not carry over. See the display area.",
@@ -62,6 +63,7 @@ next_action = [
 evidence = [
   { kind = "source", reference = "board.toml", result = "Format 2 board description; component selection, IPSW identity and payload inputs." },
   { kind = "source", reference = "configs/ruyi_defconfig", result = "Software-render kernel configuration; explicitly no GPU switch and no UFS driver." },
+  { kind = "host", reference = "scripts/check-defconfig.py", command = "python3 scripts/check-defconfig.py --unixnu <UniXNU> --device .", revision = "04b4e558bcded5213c2d802984862dc062f28257", result = "The merged arch/SoC/OS/device configuration enables the software display path, switches nothing forbidden on, and every enabled switch is read by a build script. Verified negative: adding CONFIG_XNU_NATIVE_ADRENO and an unknown switch makes it name both." },
   { kind = "host", reference = "https://unixnu.com/porting/device-repository", command = "python3 scripts/porting-record.py check --device ../UniXNU-ruyi", revision = "04b4e558bcded5213c2d802984862dc062f28257", result = "The record checker accepts this record: 13 structured areas, no identity or coverage errors." },
 ]
 

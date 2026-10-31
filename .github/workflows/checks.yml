@@ -32,6 +32,9 @@ jobs:
       - name: Pin lengths (a truncated sha256 never matches)
         run: python3 scripts/check-pins.py
 
+      - name: Effective kernel configuration
+        run: python3 scripts/check-defconfig.py --unixnu .unixnu --device .
+
       - name: Porting record
         run: python3 .unixnu/scripts/porting-record.py check --device .
 
