@@ -41,3 +41,12 @@ align-uio-stackbuf-declarations.patch
 # fallback. Apple's own arm64 platforms always have PAC, so upstream never saw
 # it; newer XNU renumbers the second one. This is the same rename.
 rename-pmap-non-pac-padding.patch
+
+# doconf builds the kernel configuration from the '#  NAME = [ ... ]' lines in
+# config/MASTER.<cpu> (it extracts them with sed, so the leading '#' is the file
+# convention, not a comment). bcm2837 lists neither nos_arm_asm nor nos_arm_pmap,
+# and without them osfmk/conf/files.arm64 excludes locore.s, start.s,
+# caches_asm.s and the amcc sources - every arm64 boot, cache and copyio symbol
+# then comes up undefined at link. Newer XNU and the shared UniXNU machine-layer
+# patch both enable them here.
+enable-nos-arm-asm.patch
