@@ -126,44 +126,22 @@ jobs:
           # value ('RUYI' + 1), not a device ECID: it only seeds IOPlatformUUID.
           echo "value=0x5357454554000001" >> "$GITHUB_OUTPUT"
 
-      - name: Provide availability.pl to the macOS SDK
+      - name: Note the xnu-8796 build patches
         run: |
-          # xnu-8796 generates bsd/sys/_symbol_aliasing.h with
-          # bsd/sys/make_symbol_aliasing.sh, which looks for
-          #   ${SDKROOT}/${DRIVERKITROOT}/usr/local/libexec/availability.pl
-          # and fails the build if it is absent. The xnu-10063 tree the UniXNU
-          # build driver targets instead honours an XNU_AVAILABILITY_PL
-          # environment variable, which is why the driver only installs the file
-          # into its own fakeroot. This profile runs xnu-8796, so the file has to
-          # exist under the SDK the build uses.
-          # Two SDKs are involved: installhdrs runs with SDKROOT=macosx and the
-          # kernel build runs with SDKROOT=iphoneos, so both need the file.
-          git clone -q --depth 1 --branch "${AVAILABILITY_TAG:-AvailabilityVersions-141.1}" \
-            https://github.com/apple-oss-distributions/AvailabilityVersions.git "$RUNNER_TEMP/av"
-          make -C "$RUNNER_TEMP/av" install -j"$(sysctl -n hw.ncpu)" \
-            OBJROOT="$RUNNER_TEMP/av-build" SYMROOT="$RUNNER_TEMP/av-build" \
-            DSTROOT="$RUNNER_TEMP/av-root" \
-            CMAKE="$(command -v cmake)" NINJA="$(command -v ninja)"
-          built="$RUNNER_TEMP/av-root/usr/local/libexec/availability.pl"
-          [ -x "$built" ] || { echo "::error::availability.pl was not built"; exit 1; }
-          missing=0
-          for sdk_name in macosx iphoneos; do
-            sdk="$(xcrun --sdk "$sdk_name" --show-sdk-path 2>/dev/null || true)"
-            [ -n "$sdk" ] || { echo "no $sdk_name SDK"; continue; }
-            if [ -x "$sdk/usr/local/libexec/availability.pl" ]; then
-              echo "already present in $sdk_name"
-              continue
-            fi
-            sudo mkdir -p "$sdk/usr/local/libexec"
-            sudo install -m 755 "$built" "$sdk/usr/local/libexec/availability.pl"
-            echo "installed into $sdk_name: $sdk/usr/local/libexec/availability.pl"
-            missing=1
-          done
-          for sdk_name in macosx iphoneos; do
-            sdk="$(xcrun --sdk "$sdk_name" --show-sdk-path 2>/dev/null || true)"
-            [ -n "$sdk" ] && ls -l "$sdk/usr/local/libexec/availability.pl"
-          done
-          exit 0
+          # Two compatibility hunks live in device/patches/xnu/series because the
+          # shared arch/soc/os series targets xnu-10063:
+          #
+          #   local-availability.patch  make_symbol_aliasing.sh honours
+          #     XNU_AVAILABILITY_PL, which the build driver already exports. The
+          #     xnu-10063 generator does this itself; xnu-8796 does not, and the
+          #     installhdrs pass dies without it.
+          #   drop-trivial-auto-var-init-acknowledgement.patch  current clang
+          #     rejects Apple's acknowledgement flag for the experimental
+          #     -ftrivial-auto-var-init feature as an unknown argument.
+          #
+          # No SDK mutation is needed: the driver installs availability.pl into
+          # its own fakeroot and the patch redirects the generator there.
+          grep -c '^[a-z].*\.patch$' device/patches/xnu/series | xargs echo "device xnu patches:"
 
       - name: Select the device
         working-directory: unixnu

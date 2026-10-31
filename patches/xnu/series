@@ -1,11 +1,21 @@
-# Board patch series for ruyi, applied after the arch/os fragments.
+# XNU patches for this board and profile.
 #
-# Empty on purpose: this port carries no board patch yet.
-#
-# The board needs no XNU source change for the software-render milestone beyond
-# what the selected components provide. Anything added here must be a ruyi board
-# difference with its own evidence; shared fixes belong upstream, not here.
-#
-# Do not reference the shared arch/soc/os series from here. They target
-# xnu-10063.141.1; this port runs xnu-8796 (Darwin 22) and the hunks would not
-# match. See the [kernel] patch_series comment in board.toml.
+# Both are compatibility fixes for building xnu-8796 with a current Xcode clang,
+# not behaviour changes. They are device-local copies because the shared
+# arch/soc/os series targets xnu-10063; these two hunks apply unchanged to
+# xnu-8796's sources.
+
+# make_symbol_aliasing.sh looks availability.pl up under ${SDKROOT} in
+# xnu-8796. The build driver already installs that file into its fakeroot and
+# exports XNU_AVAILABILITY_PL, but only xnu-10063's generator honours the
+# variable. Without this the installhdrs pass dies with
+# "Unable to locate ....sdk//usr/local/libexec/availability.pl".
+local-availability.patch
+
+# makedefs/MakeInc.def passes
+# -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang,
+# the acknowledgement flag Apple's clang needed while the feature was
+# experimental. Current clang rejects it as an unknown argument, which fails
+# every C and C++ compile. -ftrivial-auto-var-init=zero remains, so the
+# behaviour is unchanged.
+drop-trivial-auto-var-init-acknowledgement.patch
