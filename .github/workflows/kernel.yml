@@ -234,6 +234,19 @@ jobs:
           done
           ls "$sdk/usr/local/include/kernel/os" | head -8
 
+          # The same gap breaks the link step: the driver builds
+          # libfirehose_kernel.a into .cache/fakeroot/usr/local/lib/kernel
+          # (scripts/build-firehose.sh), and the linker searches
+          # -L$(SDKROOT)/usr/local/lib/kernel. Point the SDK path at the
+          # fakeroot directory the build will fill. It does not exist yet, so the
+          # link is created dangling on purpose and becomes live when
+          # build-firehose.sh installs the archive.
+          work=$(./unixnu status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["output"])')
+          echo "work: $work"
+          sudo mkdir -p "$sdk/usr/local/lib"
+          sudo ln -sfn "$work/tree/.cache/fakeroot/usr/local/lib/kernel" "$sdk/usr/local/lib/kernel"
+          ls -l "$sdk/usr/local/lib/kernel"
+
       - name: Build kernel
         working-directory: unixnu
         env:
