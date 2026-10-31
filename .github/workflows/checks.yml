@@ -35,6 +35,17 @@ jobs:
       - name: Porting record
         run: python3 .unixnu/scripts/porting-record.py check --device .
 
+      - name: Firmware payload integration (needs a ruyi Mu-Silicium checkout)
+        run: |
+          # No ruyi Mu-Silicium repository is published yet, so this runs only when
+          # the checkout is supplied. It is a wiring check, not a firmware build.
+          if [ -d ../uefi-ruyi ]; then
+            python3 scripts/check-firmware.py --uefi ../uefi-ruyi
+          else
+            echo "SKIP: no ruyi Mu-Silicium checkout at ../uefi-ruyi"
+            echo "      the integration patch and checker are still recorded in firmware/"
+          fi
+
       - name: The display builder must verify the ABI audit and then refuse
         run: |
           # It must fail (the object size and backend leaves are still missing)...

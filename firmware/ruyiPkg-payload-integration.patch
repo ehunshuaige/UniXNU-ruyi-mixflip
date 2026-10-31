@@ -1,0 +1,60 @@
+diff --git a/Platforms/Xiaomi/ruyiPkg/ruyi.dsc b/Platforms/Xiaomi/ruyiPkg/ruyi.dsc
+index 8ba2ff5..164ebcc 100644
+--- a/Platforms/Xiaomi/ruyiPkg/ruyi.dsc
++++ b/Platforms/Xiaomi/ruyiPkg/ruyi.dsc
+@@ -99,6 +99,19 @@
+   DarwinBootPkg/Driver/DarwinBoot.inf
+   ruyiPkg/Drivers/RuyiInitrdDxe/RuyiInitrdDxe.inf
+ 
++  #
++  # Payload filesystem.
++  #
++  # RuyiInitrdDxe publishes the bootloader's in-RAM payload as Block I/O. These
++  # four turn that into EFI_SIMPLE_FILE_SYSTEM_PROTOCOL so UniXNU can read
++  # \EFI\UniXNU\unixnu.toml and DarwinBoot can load the kernel from it.
++  # EnglishDxe supplies the Unicode collation service the FAT driver requires.
++  #
++  MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
++  MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
++  MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
++  FatPkg/EnhancedFatDxe/Fat.inf
++
+   #
+   # ACPI Tables
+   #
+diff --git a/Platforms/Xiaomi/ruyiPkg/ruyi.fdf b/Platforms/Xiaomi/ruyiPkg/ruyi.fdf
+index a0fba03..489e255 100644
+--- a/Platforms/Xiaomi/ruyiPkg/ruyi.fdf
++++ b/Platforms/Xiaomi/ruyiPkg/ruyi.fdf
+@@ -97,9 +97,30 @@ READ_LOCK_STATUS   = TRUE
+   #INF MdeModulePkg/Universal/Acpi/AcpiPlatformDxe/AcpiPlatformDxe.inf
+   #INF RuleOverride = ACPITABLE giulia/AcpiTables.inf
+ 
+-  # UniXNU
++  # UniXNU: boot manager, boot-option registration and the XNU loader.
++  #
++  # DarwinBoot must be in the firmware volume, not only in the payload: UniXNU
++  # hands the entry to it through the loader protocol, and the payload FAT
++  # volume is what carries the kernel and its ADT.
+   INF UniXNUPkg/Application/UniXNU/UniXNU.inf
+   INF UniXNUPkg/Driver/UniXNUDxe/UniXNUDxe.inf
++  INF DarwinBootPkg/Driver/DarwinBoot.inf
++
++  # Payload discovery.
++  #
++  # The Android bootloader leaves the payload FAT image in RAM. RuyiInitrdDxe
++  # finds it (scanning only DDR the memory map and the device tree both
++  # describe, so the scan cannot fault), publishes it as Block I/O, and lets the
++  # partition, disk and FAT drivers expose EFI_SIMPLE_FILE_SYSTEM_PROTOCOL so
++  # UniXNU can read \EFI\UniXNU\unixnu.toml.
++  #
++  # All four are needed. Without them the UniXNU menu comes up with no entries
++  # and the boot stops there.
++  INF ruyiPkg/Drivers/RuyiInitrdDxe/RuyiInitrdDxe.inf
++  INF MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
++  INF MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
++  INF MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
++  INF FatPkg/EnhancedFatDxe/Fat.inf
+ 
+   # IORT DT
+   INF QcomPkg/Drivers/IortDtDxe/IortDtDxe.inf

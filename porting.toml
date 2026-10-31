@@ -67,9 +67,9 @@ evidence = [
 
 [[area]]
 id = "firmware"
-status = "planned"
+status = "implemented"
 components = ["DarwinBoot"]
-paths = ["proprietary-files.txt", "scripts/check-ruyi.py", "docs/evidence/**"]
+paths = ["proprietary-files.txt", "scripts/check-firmware.py", "firmware/**", "docs/evidence/**"]
 inputs = [
   "A Mu-Silicium checkout carrying a ruyi board package: ruyi.dsc/fdf copied from the same-SoC giulia package with the board identity, the 1224x2912 framebuffer PCDs and the Display_Reserved memory map entry changed.",
   "ABL's scanout reservation: 0xFC400000 + 45 MiB (0x2B00000), from the ruyi live FDT /reserved-memory/splash_region (label cont_splash_region).",
@@ -88,12 +88,14 @@ findings = [
   "SimpleFbDxe looks the scanout region up by the name 'Display Reserved' and installs no GOP when the name is absent, while ABL only keeps the panel powered for a region labelled 'cont_splash_region'. Both names must be present in the firmware DTB, which is why the alias is a boot-image dtb_node and not a second node in the XNU hardware tree.",
   "Adding the alias to dts/ruyi.dts instead would make the payload tree carry a duplicate reservation and fdtput fails with FDT_ERR_EXISTS.",
   "No ruyi Mu-Silicium checkout is published, so the firmware paths in board.toml are the intended layout and have not been built from this repository.",
+  "The ruyiPkg inherited from the same-SoC giulia package carried UniXNU and UniXNUDxe in its FDF but not DarwinBoot, and wired no disk, partition or FAT driver at all. A firmware built from that description boots to the UniXNU menu and then offers no entries, because the in-RAM payload FAT volume is never published. firmware/ruyiPkg-payload-integration.patch adds DarwinBoot, the board's RuyiInitrdDxe, PartitionDxe, DiskIoDxe, EnglishDxe and the FAT driver to both the DSC [Components] and the FDF.",
+  "RuyiInitrdDxe is board-local rather than the shared UniXNURamDiskDxe: it is the giulia driver adapted with ruyi's DDR-bank scan rules, so the scan cannot walk past the end of a declared bank into unmapped memory. Either satisfies the integration; scripts/check-firmware.py accepts both.",
 ]
 completion = [
   "The firmware image builds, enters UniXNU, publishes the GOP framebuffer at the ABL scanout address and preserves the documented reservations.",
 ]
 limits = [
-  "Firmware integration is not built here: no ruyi UEFI repository is published and no FD exists in this repository.",
+  "Firmware integration is not built here: no edk2 toolchain is available in this environment and no ruyi Mu-Silicium repository is published. scripts/check-firmware.py verifies the DSC/FDF wiring, not that the firmware runs.",
   "Vendor firmware blobs for the SoC (clock, TLMM, PMIC) are not inventoried in proprietary-files.txt yet.",
 ]
 next_action = [
@@ -102,6 +104,7 @@ next_action = [
 evidence = [
   { kind = "source", reference = "docs/evidence/RUYI-FDT-FACTS.md", result = "ABL scanout reservation quoted from the live ruyi FDT: 0xfc400000 + 0x2b00000." },
   { kind = "source", reference = "board.toml", result = "Firmware inputs and the display_reserved boot-image alias." },
+  { kind = "host", reference = "firmware/ruyiPkg-payload-integration.patch", command = "python3 scripts/check-firmware.py --uefi <ruyi Mu-Silicium checkout>", revision = "04b4e558bcded5213c2d802984862dc062f28257", result = "With the patch applied the firmware carries the boot manager, DarwinBoot, the ramdisk Block I/O driver and the partition/disk/FAT stack; every FDF INF is also a DSC component. Verified negative: removing the disk stack makes the check fail with the specific missing modules." },
 ]
 
 [[area]]

@@ -37,24 +37,41 @@ about which links are verified and which are not:
 | IPSW identity and member pins | host-verified, cross-checked against an independent SM8650 iOS 16 port |
 | Prelink roots exist in the target kernelcache | host-verified, 31/31 |
 | Porting record passes the UniXNU checker | host-verified, 13 areas |
+| Display ABI audited against this kernelcache | host-verified - see below |
+| Firmware payload wiring | host-verified by `check-firmware.py`; firmware not built |
 | Kernel builds and prelinks | **not run** - needs a macOS runner or the Linux toolchain |
-| Firmware builds | **not run** - no published ruyi Mu-Silicium checkout |
-| Display driver builds | **blocked** - see below |
+| Display driver builds | **blocked** - two inputs still missing |
 | Boots to SpringBoard on the internal panel | **not demonstrated** |
 
-### The display blocker, stated plainly
+### The display ABI, and what is still missing
 
 The earlier ruyi bring-up device-verified a CPU-copy display driver, but audited
-its ABI against the **iPadOS 17.7.11** kernelcache. The iOS 16.7.16 kernelcache
-carries a different `IOMobileGraphicsFamily` binary (343.0.0, `__TEXT_EXEC`
-sha256 `03e4c4d8…`, versus `2e044ee6…` for the iPadOS build). The recorded vtable
-offsets, abstract slots and object size therefore do not describe this image, and
-reusing them would produce a driver that silently dispatches to the wrong
-functions.
+its ABI against the **iPadOS 17.7.11** kernelcache. This profile runs the iOS
+16.7.16 kernelcache, where `IOMobileGraphicsFamily` is a different binary, so
+those facts do not apply.
 
-Before the display archive can be built for this profile, the ABI audit must be
-re-run against a 20H392 prelink candidate. That is the next concrete step, and it
-is why the display area is `planned` rather than `device-verified`.
+That audit has now been redone from the pinned kernelcache and is committed as
+`drivers/RuyiDisplay/mobile-graphics-legacy-abi.json`:
+
+| Fact | iOS 16.7.16 (20H392) | iPadOS 17.7.11 (for contrast) |
+| --- | --- | --- |
+| `IOMobileGraphicsFamily` | 343.0.0 | - |
+| `__TEXT_EXEC` sha256 | `03e4c4d8…` | `2e044ee6…` |
+| Legacy vtable | `0xfffffff006def8e0` | - |
+| virtual entries | **338** | 358 |
+| abstract slots | `[211, 212, 242, 243, 292, 293, 321, 322, 329]` | `[211, 213, 245, 246, 306, 307, 337, 338, 345]` |
+| C2 constructor | `0xfffffff005c0bbc8` | - |
+
+The two binaries differ in both slot count and abstract set, which is exactly why
+the old audit could not be reused: a driver built from it would link and then
+dispatch through the wrong entries.
+
+The archive still cannot be built, for two concrete reasons recorded in the
+JSON: the Legacy **object size** is not derivable from the kernelcache and must
+come from a live prelink run, and the nine **backend leaf implementations** plus
+the original-bindings assembly are not written yet.
+`scripts/build-gop-legacy-display.py` verifies the committed audit against the
+pinned kernelcache and then stops with that list.
 
 ## Repository layout
 
@@ -64,7 +81,14 @@ porting.toml            the authoritative porting record (13 areas)
 configs/ruyi_defconfig  kernel configuration for the software-render profile
 dts/ruyi.dts            board device tree (internal panel only)
 patches/xnu/series      board patch series (empty: no board patches yet)
-scripts/check-scope.py  enforces "no GPU driver, no cover display"
+scripts/check-scope.py    enforces "no GPU driver, no cover display"
+scripts/check-tree.py     compiles the DTS and validates the generated ADT
+scripts/check-pins.py     catches truncated sha256 pins
+scripts/check-firmware.py checks the ruyi UEFI DSC/FDF payload wiring
+scripts/build-gop-legacy-display.py  display archive builder (fails with the remaining work)
+soc/sm8650/             board-local SM8650 resource slice
+drivers/RuyiDisplay/    the audited iOS 16 display ABI
+firmware/               the ruyi UEFI payload-integration patch and its rationale
 docs/evidence/          raw reads the record cites (FDT facts, IPSW facts, prelink roots)
 ```
 
