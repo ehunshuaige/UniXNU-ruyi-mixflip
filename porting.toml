@@ -442,7 +442,7 @@ evidence = [
 id = "packaging"
 status = "host-verified"
 components = ["XnuPrelink"]
-paths = ["board.toml", "patches/**", "docs/evidence/**"]
+paths = ["board.toml", "docs/evidence/**"]
 inputs = [
   "iOS 16.7.16 / 20H392 IPSW of the iPhone X; member sha256 pins computed from the local archive and cross-checked against lonzzi/UniXNU-houji's published pins (all four agree).",
   "Kernelcache: kernelcache.release.iphone10b, decompressed arm64 slice sha256 2ec297ba..., which the prelink step pins.",
