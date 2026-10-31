@@ -1,0 +1,11 @@
+# Board patch series for ruyi, applied after the arch/os fragments.
+#
+# Empty on purpose: this port carries no board patch yet.
+#
+# The board needs no XNU source change for the software-render milestone beyond
+# what the selected components provide. Anything added here must be a ruyi board
+# difference with its own evidence; shared fixes belong upstream, not here.
+#
+# Do not reference the shared arch/soc/os series from here. They target
+# xnu-10063.141.1; this port runs xnu-8796 (Darwin 22) and the hunks would not
+# match. See the [kernel] patch_series comment in board.toml.

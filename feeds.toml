@@ -1,0 +1,11 @@
+# ruyi uses a board-local SM8650 resource slice instead of a shared SoC
+# repository: no UniXNU-sm8650-common exists, and creating one from a single
+# device would be premature. The slice is versioned by this repository's own
+# commits, the same arrangement kerrinz/UniXNU-zorn uses for this SoC.
+#
+# When a reviewed shared SM8650 repository is published, replace this local
+# source with a pinned git source and move soc/sm8650/ there.
+[[source]]
+name = "sm8650"
+kind = "soc"
+local = "soc/sm8650"

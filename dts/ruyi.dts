@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Xiaomi MIX Flip (ruyi, SM8650) board device tree for UniXNU format 2.
+//
+// This file carries only BOARD wiring and reservations. The SoC resources it
+// needs - GICv3, the generic timer, the CPU topology and the UFS host - come
+// from the board-local SM8650 slice:
+//
+//     soc/sm8650/dts/sm8650.dtsi
+//
+// selected through board.toml [device_tree] include_dirs = ["soc:dts"] and
+// feeds.toml's local soc source.
+//
+// Every value here is read out of the live ruyi FDT that the stock ABL hands to
+// the kernel; each one is quoted with its node in
+// docs/evidence/RUYI-FDT-FACTS.md, and porting.toml records the provenance per
+// area. Do not add a value whose source you cannot name.
+//
+// SCOPE: the internal (folding) display only, 1224 x 2912 native, stride 4896.
+// The cover display has no node here and no property anywhere in this tree.
+// No GPU node is exported: the software-render profile must reach SpringBoard
+// with CoreAnimation on the CPU, so there is nothing for a GPU driver to match.
+
+/dts-v1/;
+/include/ "sm8650.dtsi"
+
+/ {
+    model = "Xiaomi MIX Flip";
+    compatible = "xiaomi,ruyi", "qcom,sm8650";
+
+    // Kernel-managed DRAM window.
+    //
+    // Source: ruyi live FDT /memory, which lists the DDR as Qualcomm
+    // carve-outs. The only contiguous run large enough for a foreign OS is the
+    // upper bank:
+    //   0x8c0000000 + 3 GiB  (ends 0x980000000)
+    //   0x980000000 + 6 GiB  (ends 0xb00000000)
+    // i.e. 0x8c0000000 .. 0xb00000000 = 9 GiB, adjacent with no hole between
+    // them. The verified ruyi bring-up used exactly dram-base 0x8c0000000 with
+    // a 9 GiB window; see docs/evidence/RUYI-FDT-FACTS.md "DRAM".
+    //
+    // Do not widen this: the run ends at 0xb00000000 and the next range below
+    // it (0x8b8100000..0x8b9f00000) is a separate 29 MiB carve-out with a gap,
+    // so a larger window would claim unmapped DDR. payload.dram_size in
+    // board.toml must equal this size exactly or the payload step refuses the
+    // tree.
+    memory@8c0000000 {
+        device_type = "memory";
+        reg = <0x8 0xc0000000 0x2 0x40000000>;
+    };
+
+    reserved-memory {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+
+        // ABL's scanout buffer, ruyi live FDT /reserved-memory/splash_region:
+        //   label = "cont_splash_region"
+        //   reg   = <0x0 0xfc400000 0x0 0x2b00000>      (0xFC400000, 45 MiB)
+        //
+        // This is the buffer the bootloader is already scanning out when it
+        // jumps to the payload, so the display stays lit across the handoff.
+        // The kernel copies composited frames into it.
+        //
+        // The label must stay "cont_splash_region": that is the name ABL itself
+        // uses, and it is what keeps the panel powered across the jump.
+        //
+        // The firmware's SimpleFbDxe looks up a DIFFERENT name, "Display
+        // Reserved", and installs no GOP when it is absent. That alias belongs
+        // to the boot image's copy of the firmware DTB, added by board.toml
+        // [[bootimg.dtb_node]]. Do not add it here: this tree is the XNU
+        // hardware tree, and a duplicate node makes fdtput fail with
+        // FDT_ERR_EXISTS.
+        splash_region: framebuffer@fc400000 {
+            label = "cont_splash_region";
+            reg = <0x0 0xfc400000 0x0 0x2b00000>;
+            no-map;
+        };
+    };
+};
+
+// Board policy on the shared SoC slice.
+//
+// SM8650 is 2x Cortex-A520 + 5x Cortex-A720 + 1x Cortex-X4. The two A520s are
+// the E cluster; everything else is P. The slice defines the CPUs, affinities
+// and capacities from the live FDT; the split is board policy, so it is set
+// here rather than in the shared file.
+&cpu0 { unixnu,cluster-type = "E"; };
+&cpu1 { unixnu,cluster-type = "E"; };
+&cpu2 { unixnu,cluster-type = "P"; };
+&cpu3 { unixnu,cluster-type = "P"; };
+&cpu4 { unixnu,cluster-type = "P"; };
+&cpu5 { unixnu,cluster-type = "P"; };
+&cpu6 { unixnu,cluster-type = "P"; };
+&cpu7 { unixnu,cluster-type = "P"; };
+
+// UFS stays disabled for the software-render profile: the root filesystem is a
+// RAM disk (rd=md0), so enabling it would add an unverified DMA consumer to the
+// boot path for no gain. The register windows are described in the slice so the
+// UFS-root route can be enabled as a separate, separately verified change.
+&ufs { status = "disabled"; };
+&ufsphy { status = "disabled"; };

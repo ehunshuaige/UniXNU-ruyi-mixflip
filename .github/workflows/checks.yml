@@ -1,0 +1,41 @@
+name: Repository checks
+
+# Host checks that need no device and no Apple input:
+#   - the scope rules: no GPU driver, no cover display
+#   - the hardware tree: board DTS compiles, ADT generates, and the values the
+#     selected components read are present and consistent
+#   - the porting record
+
+on: [push, pull_request]
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends device-tree-compiler python3
+
+      - name: Fetch the UniXNU build driver
+        uses: actions/checkout@v4
+        with:
+          repository: UniXNU/UniXNU
+          path: .unixnu
+
+      - name: Scope rules (no GPU driver, no cover display)
+        run: python3 scripts/check-scope.py
+
+      - name: Hardware tree and ADT
+        run: python3 scripts/check-tree.py --unixnu .unixnu --device .
+
+      - name: Porting record
+        run: python3 .unixnu/scripts/porting-record.py check --device .
+
+      - name: The display builder must refuse to build until the ABI audit exists
+        run: |
+          if python3 scripts/build-gop-legacy-display.py 2>/dev/null; then
+            echo "the display builder succeeded, but the iOS 16 ABI audit is not committed"
+            exit 1
+          fi
+          echo "display builder correctly refuses: the 20H392 ABI audit is missing"

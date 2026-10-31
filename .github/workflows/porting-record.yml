@@ -1,0 +1,18 @@
+name: Device documentation
+
+# The official device-branch check. It validates the porting record against the
+# UniXNU schema: identity must match board.toml, all 13 areas must be present,
+# every selected component and dependency must be covered by an area, and every
+# evidence entry must resolve.
+#
+# Add the repository to the UniXNU catalog with the `unixnu` topic once the port
+# has a device result to publish.
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  porting-record:
+    uses: UniXNU/UniXNU/.github/workflows/porting-record.yml@main

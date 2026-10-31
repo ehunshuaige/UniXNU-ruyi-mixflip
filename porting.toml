@@ -1,0 +1,499 @@
+schema_version = 1
+
+[device]
+name = "ruyi"
+soc = "SM8650"
+os_profile = "ios-16.7.16-20H392"
+summary = "Xiaomi MIX Flip (ruyi, SM8650) running the iOS 16.7.16 userland of the iPhone X. This record covers the software-render profile: CoreAnimation composites on the CPU, frames are copied into the ABL scanout buffer, and no GPU driver is built or loaded. Only the internal 1224x2912 panel is described."
+
+# How to read the completion levels in this record.
+#
+#   planned          inputs identified, no implementation in this repository yet
+#   implemented      source exists here and is referenced; not run anywhere
+#   host-verified    a command on a development host produced the stated result
+#   device-verified  the stated result was observed on a ruyi device
+#
+# Nothing in this repository is `device-verified`. The port has not been booted
+# from this repository: the display driver it selects was device-verified by an
+# earlier bring-up against a *different* kernelcache (iPadOS 17.7.11), and the
+# iOS 16 ABI audit that would carry that result over has not been done. See the
+# display area. Claims are kept separate from intentions throughout.
+
+[[area]]
+id = "configuration"
+status = "host-verified"
+components = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink"]
+paths = ["board.toml", "feeds.toml", "configs/**", "dts/**", "soc/**", ".github/**", ".gitignore", "AGENTS.md", "README.md"]
+inputs = [
+  "SM8650 SoC profile: the board-local slice in soc/sm8650/ (selected by feeds.toml local source), holding the GICv3, generic timer, CPU topology and UFS resources. No shared SM8650 repository exists.",
+  "iOS 16.7.16 build 20H392, iPhone10,3 / d22ap, chip ID 0x8015, board ID 0x06 - all from BuildManifest.plist of the pinned IPSW.",
+  "Device defconfig configs/ruyi_defconfig and the software-render component set.",
+]
+configuration = [
+  "schema_version = 2; board.soc_source = sm8650; board.os_profile = ios-16.7.16-20H392.",
+  "[components] include = ArmDTPlatform, ArmCpu, SoftwareAES, XnuPrelink, GopFramebuffer. No GPU component is selected; software rendering is this component set, not a disabled switch.",
+  "config_fragments = arch:configs/common.config, os:configs/ipados.config; patch_series = arch, os, device.",
+  "board.kit = ruyi; kernel.defconfig = ruyi_defconfig.",
+]
+procedure = [
+  "Run ./unixnu defconfig ruyi_defconfig -D ../UniXNU-ruyi from a UniXNU checkout.",
+  "Run ./unixnu status --json -D ../UniXNU-ruyi and review the resolved profiles, component order and patch order.",
+  "Run python3 scripts/porting-record.py check --device ../UniXNU-ruyi.",
+]
+findings = [
+  "Format 2 merges tables in arch, SoC, OS, device order and replaces ordinary arrays. There is no UniXNU-sm8650-common repository, so board.soc_source names a board-local slice (feeds.toml kind = soc, local = soc/sm8650), the same arrangement kerrinz/UniXNU-zorn uses. The slice holds SoC resources; board wiring, reservations and the panel stay in dts/ruyi.dts.",
+  "kernel.patch_series selects only device:patches/xnu/series. The shared arch/soc/os series in this snapshot are written against xnu-10063.141.1 while this port runs xnu-8796, so referencing them would apply hunks to the wrong source; both working SM8650 iOS-16 ports use the single-series form.",
+  "The ruyi board was previously described in format 1 against the iPadOS 17.7.11 profile. That profile's kernelcache is a different Apple build from the iOS 16.7.16 one, so its prelink pins cannot be reused: every prelink input here is recomputed from the 20H392 IPSW.",
+  "The iOS 16.7.16 kernelcache's IOMobileGraphicsFamily is a different binary from the iPadOS 17 one (executable sha256 03e4c4d8... vs 2e044ee6...), so display ABI facts do not carry over. See the display area.",
+]
+completion = [
+  "All source pins resolve; every selected component has an owning area; status shows the intended component and patch order.",
+  "The porting record checker reports no identity, coverage or evidence errors.",
+]
+limits = [
+  "The SoC layer is a board-local slice (soc/sm8650/, feeds.toml local source), not a shared repository: no UniXNU-sm8650-common exists in the UniXNU organisation. kerrinz/UniXNU-zorn uses the same arrangement for this SoC. This is a deliberate temporary state, not the target architecture.",
+  "Local build overrides can select different sources from the published pins; any verification must record the effective source.",
+  "The shared arch/soc/os patch series in this UniXNU snapshot target xnu-10063.141.1 while this port runs xnu-8796, so board.toml selects only the device series. Patch applicability against xnu-8796 was not re-tested here (no macOS host or xnu-8796 checkout was available); the one-series form is what kerrinz/UniXNU-zorn and Asultop/UniXNU-NX769J use for the same reason.",
+]
+next_action = [
+  "When a reviewed UniXNU-sm8650-common is published, replace the local slice with a pinned git source and reduce soc/sm8650/ to nothing.",
+  "Re-test the shared patch series against an xnu-8796 checkout before referencing any of it.",
+]
+evidence = [
+  { kind = "source", reference = "board.toml", result = "Format 2 board description; component selection, IPSW identity and payload inputs." },
+  { kind = "source", reference = "configs/ruyi_defconfig", result = "Software-render kernel configuration; explicitly no GPU switch and no UFS driver." },
+  { kind = "host", reference = "https://unixnu.com/porting/device-repository", command = "python3 scripts/porting-record.py check --device ../UniXNU-ruyi", revision = "04b4e558bcded5213c2d802984862dc062f28257", result = "The record checker accepts this record: 13 structured areas, no identity or coverage errors." },
+]
+
+[[area]]
+id = "firmware"
+status = "planned"
+components = ["DarwinBoot"]
+paths = ["proprietary-files.txt", "scripts/check-ruyi.py", "docs/evidence/**"]
+inputs = [
+  "A Mu-Silicium checkout carrying a ruyi board package: ruyi.dsc/fdf copied from the same-SoC giulia package with the board identity, the 1224x2912 framebuffer PCDs and the Display_Reserved memory map entry changed.",
+  "ABL's scanout reservation: 0xFC400000 + 45 MiB (0x2B00000), from the ruyi live FDT /reserved-memory/splash_region (label cont_splash_region).",
+  "Boot image parameters: FD base/size and the shim header, from the same Mu-Silicium device configuration.",
+]
+configuration = [
+  "firmware.config = ruyi; firmware.dsc = Platforms/Xiaomi/ruyiPkg/ruyi.dsc; firmware.fd = Build/ruyiPkg/{target}_CLANGPDB/FV/SILICIUM_UEFI.fd.",
+  "firmware.defines: ENABLE_SECUREBOOT = 1, DEVICE_MODEL = ruyi, MEMORY_PROTECTION = TRUE, SHIP_MODE = FALSE, BUILDID_STRING = ruyi-research.",
+  "[[bootimg.dtb_node]] adds /reserved-memory/display_reserved with label 'Display Reserved' and the same 0xFC400000/0x2B00000 range to the firmware DTB only.",
+]
+procedure = [
+  "Build the UEFI firmware from the ruyi Mu-Silicium checkout, then assemble the boot image with the firmware DTB.",
+  "Inspect the boot image: the firmware volume, the shim and the appended DTB must carry the display_reserved alias.",
+]
+findings = [
+  "SimpleFbDxe looks the scanout region up by the name 'Display Reserved' and installs no GOP when the name is absent, while ABL only keeps the panel powered for a region labelled 'cont_splash_region'. Both names must be present in the firmware DTB, which is why the alias is a boot-image dtb_node and not a second node in the XNU hardware tree.",
+  "Adding the alias to dts/ruyi.dts instead would make the payload tree carry a duplicate reservation and fdtput fails with FDT_ERR_EXISTS.",
+  "No ruyi Mu-Silicium checkout is published, so the firmware paths in board.toml are the intended layout and have not been built from this repository.",
+]
+completion = [
+  "The firmware image builds, enters UniXNU, publishes the GOP framebuffer at the ABL scanout address and preserves the documented reservations.",
+]
+limits = [
+  "Firmware integration is not built here: no ruyi UEFI repository is published and no FD exists in this repository.",
+  "Vendor firmware blobs for the SoC (clock, TLMM, PMIC) are not inventoried in proprietary-files.txt yet.",
+]
+next_action = [
+  "Publish the ruyi Mu-Silicium board package, then build the firmware and record the FD hash and memory map.",
+]
+evidence = [
+  { kind = "source", reference = "docs/evidence/RUYI-FDT-FACTS.md", result = "ABL scanout reservation quoted from the live ruyi FDT: 0xfc400000 + 0x2b00000." },
+  { kind = "source", reference = "board.toml", result = "Firmware inputs and the display_reserved boot-image alias." },
+]
+
+[[area]]
+id = "cpu"
+status = "planned"
+components = ["ArmCpu", "ArmDTPlatform"]
+paths = ["dts/ruyi.dts", "configs/ruyi_defconfig"]
+inputs = [
+  "GICv3 distributor at 0x17100000 (64 KiB) and redistributors at 0x17180000 (2 MiB), with redistributor stride 0x40000 - GICv4, four frames per PE. All from the ruyi live FDT.",
+  "Generic timer 19,200,000 Hz and virtual timer PPI 27 (INTID 16+11), from the ruyi live FDT /timer.",
+  "Eight CPUs with MPIDR affinities 0x0, 0x100 ... 0x700 and capacities 0x400/0x400/0x700 x5/0x766, from the ruyi live FDT /cpus.",
+  "PSCI 1.0 over SMC, from the ruyi live FDT /psci.",
+]
+configuration = [
+  "soc/sm8650/dts/sm8650.dtsi exports intc with unixnu,adt-name = intc, reg = <0 0x17100000 0 0x10000>, <0 0x17180000 0 0x200000>, redistributor-stride = <0 0x40000>; dts/ruyi.dts includes it.",
+  "cpu0..cpu7 carry unixnu,cluster-type: cpu0/cpu1 E (A520 pair), cpu2..cpu7 P (five A720 plus the X4).",
+  "/cpus timebase-frequency = 19200000; /psci compatible arm,psci-1.0, method smc.",
+  "Kernel argument cpus=8 exports all eight cores; cpus=1 is the documented fallback for a first bring-up boot.",
+]
+procedure = [
+  "Compile dts/ruyi.dts and generate the ADT; inspect that /cpus has eight cpuN children with the expected reg and cluster-type, that /arm-io/intc carries both GIC ranges and the 0x40000 stride, and that /psci is present.",
+  "On the device, record per-CPU entry, the timer interrupt rate and IPI delivery.",
+]
+findings = [
+  "The redistributor stride is the value most likely to be silently wrong on a GICv4 SoC: with 0x20000 every PE after the first gets another PE's frames. XNU reads it from the ADT, so the ADT must carry 0x40000 rather than the GICv3 default.",
+  "The vendor tree puts the timebase on /timer, not on /cpus; the UniXNU ADT generator reads it from /cpus, so the board DTS restates the same 19.2 MHz there. Both values come from the same FDT, so this is a placement change, not a new constant.",
+  "SM8650's CPU capacities split 2x A520 / 5x A720 / 1x X4, so an 8-core E/P split needs the capacities, not the core count, to classify the clusters.",
+]
+completion = [
+  "Every enabled CPU reaches its entry checkpoint and timer and IPI handling works on each enabled CPU.",
+]
+limits = [
+  "No ruyi device run from this repository. The GIC and timer values are read from the device's own live FDT, but this port has not booted with them.",
+  "CPU frequency and idle policy are not ported; no performance controller driver is selected.",
+]
+next_action = [
+  "Boot the payload on ruyi with cpus=1, confirm the timer tick and the console, then repeat with cpus=8 and confirm all eight CPUs enter.",
+]
+evidence = [
+  { kind = "source", reference = "docs/evidence/RUYI-FDT-FACTS.md", result = "GICv3 ranges and 0x40000 stride, /timer 0x124f800, /psci smc, eight CPU affinities and capacities, all quoted from the live ruyi FDT." },
+  { kind = "source", reference = "dts/ruyi.dts", result = "Board DTS exporting intc and cpu0..cpu7 with cluster types." },
+]
+
+[[area]]
+id = "memory"
+status = "host-verified"
+components = []
+paths = ["dts/ruyi.dts", "board.toml"]
+inputs = [
+  "DRAM layout from the ruyi live FDT /memory, decoded as 16 ranges with 2 address cells and 2 size cells.",
+  "The largest contiguous run is 0x8c0000000 .. 0xb00000000 = 9 GiB (3 GiB at 0x8c0000000 plus 6 GiB at 0x980000000, adjacent).",
+  "DarwinBoot's contiguous window: payload.adt.owned_memory_size is the loader's request, 256 MiB to 8 GiB in 2 MiB steps.",
+]
+configuration = [
+  "dts/ruyi.dts /memory@8c0000000: reg = <0x8 0xc0000000 0x2 0x40000000>, i.e. base 0x8c0000000, size 0x240000000.",
+  "The SoC resources the tree needs come from soc/sm8650/dts/sm8650.dtsi via include_dirs = [\"soc:dts\"]; the board DTS adds only the memory window and the scanout reservation.",
+  "board.toml payload.dram_size = 0x240000000, which the payload step requires to equal the DTS memory size exactly.",
+  "board.toml payload.adt.owned_memory_size = 0x200000000 (8 GiB, the loader maximum) for the RAM-disk root window.",
+]
+procedure = [
+  "Decode /memory from the live FDT, merge adjacent ranges and confirm the window lies inside a single contiguous run.",
+  "Compile the board DTS and generate the ADT with a unique chip ID; check /chosen dram-base, dram-size and darwinboot-memory-size.",
+]
+findings = [
+  "The ruyi DDR is fragmented by Qualcomm carve-outs: 16 ranges, only four contiguous runs of 256 MiB or more. A window chosen by size alone would overlap a hole. The 9 GiB run at 0x8c0000000 is the only one that fits an 8 GiB loader window.",
+  "The run ends exactly at 0xb00000000; the next range below it is a separate 29 MiB reservation at 0x8b8100000 with a gap. A 10 GiB window would therefore claim unmapped DDR, which is why the DTS does not use one.",
+  "The XNU hardware tree needs exactly one contiguous memory node: the ADT generator rejects anything else, so the board DTS cannot describe the full fragmented map.",
+]
+completion = [
+  "All handoff regions are accounted for and the kernel window lies entirely inside a contiguous run of the device's real DRAM map.",
+]
+limits = [
+  "The DTS describes the kernel-managed window only, not the full DRAM map. Regions outside it are the bootloader's business in this profile.",
+  "No SMMU or DMA ownership is described: this profile enables no DMA-capable driver.",
+]
+next_action = [
+  "On the device, confirm the loader lands at 0x8c0000000 and that the kernel's physical memory map matches the window.",
+]
+evidence = [
+  { kind = "source", reference = "docs/evidence/RUYI-FDT-FACTS.md", result = "All 16 /memory ranges, the merged contiguous runs, and the 9 GiB run used as the kernel window." },
+  { kind = "host", reference = "dts/ruyi.dts", command = "dtc -I dts -O dtb -o /tmp/ruyi.dtb dts/ruyi.dts", revision = "04b4e558bcded5213c2d802984862dc062f28257", result = "The board DTS compiles cleanly with dtc 1.7.2." },
+  { kind = "host", reference = "https://github.com/UniXNU/UniXNU/blob/04b4e558bcded5213c2d802984862dc062f28257/scripts/make-adt.py", command = "python3 scripts/make-adt.py --dtb /tmp/ruyi.dtb --os-profile profiles/os/ios-16.7.16-20H392/profile.toml --board ../UniXNU-ruyi/board.toml --unique-chip-id <seed> --output /tmp/kernel.macho.adt", revision = "04b4e558bcded5213c2d802984862dc062f28257", result = "The ADT generator accepts the tree and emits /chosen with dram-base, dram-size, darwinboot-memory-size and the eight CPU nodes." },
+]
+
+[[area]]
+id = "storage"
+status = "planned"
+components = []
+paths = ["dts/ruyi.dts", "board.toml", "configs/ruyi_defconfig"]
+inputs = [
+  "UFS host at 0x1d84000 with the five register ranges and SPI 0x109, from the ruyi live FDT /soc/ufshc@1d84000.",
+  "UFS PHY at 0x1d80000 (8 KiB), from the ruyi live FDT /soc/ufsphy_mem@1d80000.",
+  "Partition geometry from the ruyi GPT - NOT YET READ, so [userdata] is absent from board.toml on purpose.",
+]
+configuration = [
+  "dts/ruyi.dts exports ufshc and ufsphy but both are status = disabled for this profile.",
+  "configs/ruyi_defconfig sets CONFIG_XNU_NATIVE_UFS=n: the software-render milestone boots its root filesystem from a RAM disk.",
+  "board.toml has no [userdata] table; the key names are present but commented out until the GPT is read.",
+]
+procedure = [
+  "When the UFS root route is ported: read the ruyi GPT, fill [userdata] first_lba/last_lba/lba_bytes, enable the two DTS nodes and the UFS configuration, then record the LUN and GPT evidence.",
+]
+findings = [
+  "The root filesystem for the desktop milestone is a RAM disk (rd=md0), so UFS is out of the critical path and enabling it would add an unverified DMA consumer for no gain. That is why it is disabled rather than half-configured.",
+  "The UFS register list has five ranges but only ufs_mem is exported: the driver maps one window, and exporting the ICE and MCQ ranges without a driver that uses them would only invite wrong assumptions.",
+  "Writing a guessed userdata LBA range would be exactly the unverified hardware constant this port forbids, so the table is omitted rather than estimated from another SM8650 phone.",
+]
+completion = [
+  "Reads: SCSI capacity, GPT and known blocks are correct; OS/SystemOS windows stay within userdata.",
+  "Root: the configured volume mounts and launchd starts.",
+]
+limits = [
+  "UFS is disabled in this profile. The RAM-disk route is the only root path this record covers.",
+  "No userdata geometry is recorded, so the UFS route cannot be built from this repository yet.",
+]
+next_action = [
+  "Read the ruyi GPT on the device, then fill [userdata] and re-enable the UFS nodes and configuration as a separate, separately verified change.",
+]
+evidence = [
+  { kind = "source", reference = "docs/evidence/RUYI-FDT-FACTS.md", result = "UFS host compatible string, five register ranges and SPI 0x109 quoted from the live ruyi FDT." },
+  { kind = "source", reference = "configs/ruyi_defconfig", result = "CONFIG_XNU_NATIVE_UFS=n for the software-render profile." },
+]
+
+[[area]]
+id = "display"
+status = "planned"
+components = ["GopFramebuffer"]
+paths = ["dts/ruyi.dts", "board.toml", "configs/ruyi_defconfig", "docs/evidence/**"]
+inputs = [
+  "Internal (folding) panel: 1224 x 2912 native pixels, 32-bit, stride 4896 bytes (1224 * 4). Panel node qcom,mdss_dsi_n8_42_02_0a_prim_dsc_cmd, DSI command mode with DSC, 22 timing entries, from the ruyi live FDT.",
+  "Scanout memory: the ABL splash reservation at 0xFC400000, 45 MiB, from the ruyi live FDT /reserved-memory/splash_region.",
+  "Framebuffer geometry at handoff: DarwinBoot reads it from GOP; the display component requires 32-bit depth, no rotation and stride >= width*4.",
+]
+configuration = [
+  "dts/ruyi.dts /reserved-memory/splash_region carries label cont_splash_region and reg = <0x0 0xfc400000 0x0 0x2b00000>.",
+  "configs/ruyi_defconfig: CONFIG_XNU_NATIVE_LEGACY_DISPLAY=y, CONFIG_XNU_NATIVE_MOBILE_DISPLAY=n.",
+  "Kernel arguments ruyifb_noconsole=1 (stop kernel text overdrawing the composited frame) and ruyifb_hz=30 (CPU presentation rate).",
+  "Component GopFramebuffer: publishes the MobileFramebuffer (IOMobileFramebuffer) service and copies composited IOSurface rows into the GOP scanout on the CPU.",
+]
+procedure = [
+  "Compile the board DTS and confirm the splash reservation is present with the cont_splash_region label.",
+  "Build the kernel with the GopFramebuffer component and the legacy display archive, boot the payload, and read the display checkpoints from the kernel console.",
+  "Confirm on the internal panel that the composited frame appears, and record the presentation rate separately from the panel's own refresh rate.",
+]
+findings = [
+  "The display path here is CPU copy, not GPU presentation: the driver validates a compositor IOSurface and copies its rows into the scanout buffer. No Adreno command stream, no GPU firmware and no GPU driver is involved, which is what makes a SpringBoard frame possible with no GPU driver at all.",
+  "The panel is 1224 x 2912 in its own scan orientation, i.e. 2912 x 1224 as the user sees it folded open; stride is 1224*4 = 4896 bytes. A GOP-reported stride is not a substitute: the value must be the one the panel and the scanout buffer actually use.",
+  "The iOS 16.7.16 IOMobileGraphicsFamily is NOT the binary the earlier ruyi display bring-up audited. That bring-up device-verified a driver whose ABI facts were read from the iPadOS 17.7.11 kernelcache (executable sha256 2e044ee6...). The 20H392 kernelcache carries a different IOMobileGraphicsFamily (343.0.0, executable sha256 03e4c4d8...), so the vtable offsets, the nine abstract leaves and the object size in that audit do not apply and must not be reused. Re-running scripts/audit-mobile-graphics-legacy.py against a 20H392 prelink candidate is a prerequisite for building the display driver here.",
+  "No GPU driver is selected, so the render server must fall back to CPU compositing. Whether iOS 16's backboardd takes that fallback without a Metal device is the open question this profile exists to answer; it is not established by this record.",
+]
+completion = [
+  "The display publishes IOMobileFramebuffer on the internal panel and a composited frame reaches the 2912 x 1224 scanout.",
+  "The frame is produced by CPU compositing with no GPU driver loaded.",
+]
+limits = [
+  "Nothing in this area is device-verified from this repository. The display component's ABI audit against the iOS 16 kernelcache has not been done, so the archive cannot yet be built for this profile.",
+  "Backlight, display power and the panel's DSI bring-up are not implemented. The firmware leaves the panel scanning out; this profile only copies frames into the buffer it hands over.",
+  "The presentation rate (ruyifb_hz=30) is a policy value and says nothing about the panel's real refresh rate or about sustained frame rate.",
+]
+next_action = [
+  "Produce a prelink candidate for the 20H392 kernelcache, run scripts/audit-mobile-graphics-legacy.py against it, and record the resulting ABI facts as the display area's input before building the driver.",
+]
+evidence = [
+  { kind = "source", reference = "docs/evidence/RUYI-FDT-FACTS.md", result = "Internal panel node with 0x4c8 x 0xb60 (1224 x 2912) over 22 timing entries, and the 0xfc400000 + 0x2b00000 scanout reservation, both from the live ruyi FDT." },
+  { kind = "source", reference = "board.toml", result = "GopFramebuffer is the only display component; no GPU component is selected." },
+]
+
+[[area]]
+id = "input"
+status = "planned"
+components = []
+paths = ["dts/ruyi.dts", "board.toml"]
+inputs = [
+  "No input driver is selected for this profile. The touch controller and buttons are not described in dts/ruyi.dts.",
+]
+configuration = [
+  "None. configs/ruyi_defconfig selects no HID or touch component.",
+]
+procedure = [
+  "Deferred: the desktop milestone does not require touch. Add the controller, bus, interrupt and power sequence together with its own evidence when it is ported.",
+]
+findings = [
+  "The acceptance criteria for the software-render milestone do not include touch gestures, so input is out of scope rather than partially configured. An input node without a driver would only add an unused ADT entry.",
+]
+completion = [
+  "Not applicable to this milestone: the desktop is expected to appear without input.",
+]
+limits = [
+  "No touch, buttons or HID event service in this profile. The device cannot be interacted with through this port yet.",
+]
+next_action = [
+  "Read the touch controller's bus, address, interrupt and power ownership from the ruyi live FDT before writing any input driver.",
+]
+evidence = [
+  { kind = "source", reference = "configs/ruyi_defconfig", result = "No HID or touch configuration is selected." },
+]
+
+[[area]]
+id = "gpu"
+status = "not-applicable"
+components = []
+paths = ["board.toml", "configs/ruyi_defconfig"]
+inputs = [
+  "None. This profile deliberately builds and loads no GPU driver.",
+]
+configuration = [
+  "No GPU component is selected in board.toml [components]. No Adreno, AdrenoMetal, AdrenoPM4, AdrenoFirmware, ArmSmmu4K or AirNir component is present, and no GPU firmware is packaged.",
+]
+procedure = [
+  "Nothing to run. To add GPU support later, select the GPU components in board.toml and add their configuration; do not uncomment code.",
+]
+findings = [
+  "Software rendering is the design of this profile, not a workaround to be removed: the milestone is defined as SpringBoard appearing with no GPU driver, so an absent GPU area is the correct end state here.",
+  "Because no GPU component is selected, there is no Adreno command stream, no GMU/HFI handshake and no ZAP/GMU firmware in the image. A GPU driver cannot be loaded accidentally by a configuration change to this profile; it would take a component selection.",
+]
+completion = [
+  "Not applicable: absence of the GPU stack is a requirement of this milestone, not a gap.",
+]
+limits = [
+  "No hardware graphics acceleration. Metal applications, App Store and any GPU-composited UI are out of scope for this profile.",
+]
+next_action = [
+  "None for this milestone. A GPU profile would be a separate component selection and a separate record area.",
+]
+evidence = [
+  { kind = "source", reference = "board.toml", result = "Component selection lists no GPU component and no GPU firmware input." },
+]
+
+[[area]]
+id = "network"
+status = "not-applicable"
+components = []
+paths = ["board.toml"]
+inputs = [
+  "None. No network driver is selected.",
+]
+configuration = [
+  "No Wi-Fi, Bluetooth or cellular component in board.toml; no network firmware packaged.",
+]
+procedure = [
+  "Nothing to run for this milestone.",
+]
+findings = [
+  "The acceptance criteria exclude Wi-Fi, Bluetooth and cellular, so no network stack is ported and no network firmware is needed.",
+]
+completion = [
+  "Not applicable to this milestone.",
+]
+limits = [
+  "No network connectivity of any kind.",
+]
+next_action = [
+  "None for this milestone.",
+]
+evidence = [
+  { kind = "source", reference = "board.toml", result = "No network component or firmware input is selected." },
+]
+
+[[area]]
+id = "audio"
+status = "not-applicable"
+components = []
+paths = ["board.toml"]
+inputs = [
+  "None. No audio driver is selected.",
+]
+configuration = [
+  "No DSP, codec or audio component in board.toml.",
+]
+procedure = [
+  "Nothing to run for this milestone.",
+]
+findings = [
+  "Audio is excluded by the acceptance criteria. mediadiskserver-class daemons are expected to fail or relaunch without an audio device, which the record treats as out of scope rather than as a defect.",
+]
+completion = [
+  "Not applicable to this milestone.",
+]
+limits = [
+  "No audio playback or capture.",
+]
+next_action = [
+  "None for this milestone.",
+]
+evidence = [
+  { kind = "source", reference = "board.toml", result = "No audio component is selected." },
+]
+
+[[area]]
+id = "power"
+status = "planned"
+components = []
+paths = ["dts/ruyi.dts"]
+inputs = [
+  "No power, battery or regulator driver is selected. PMIC ownership stays with the bootloader and the firmware.",
+]
+configuration = [
+  "None in this profile. The DTS describes no PMIC, charger or fuel-gauge node.",
+]
+procedure = [
+  "Deferred. Battery reporting, charging and thermal policy need their own evidence before any of them is described.",
+]
+findings = [
+  "The milestone requires the desktop to appear, not a usable phone, so battery and charging are out of scope. Leaving the PMIC undescribed keeps the ADT from advertising a power domain nothing drives.",
+  "AMFI's early security initializer is deliberately not used in this profile: it panics without an ApplePMGRNub provider, and no PMGR nub is built. Deferring AMFI to normal kext loading is a boot-chain decision recorded in board.toml, not a power feature.",
+]
+completion = [
+  "Not required for this milestone: the desktop must appear without a power driver.",
+]
+limits = [
+  "No battery reporting, charging control or thermal management.",
+]
+next_action = [
+  "Defer until after the desktop milestone; then start from the PMIC's real ownership in the ruyi live FDT.",
+]
+evidence = [
+  { kind = "source", reference = "board.toml", result = "No early_security_init and no power component; the AMFI decision is documented inline." },
+]
+
+[[area]]
+id = "packaging"
+status = "host-verified"
+components = ["XnuPrelink"]
+paths = ["board.toml", "patches/**", "docs/evidence/**"]
+inputs = [
+  "iOS 16.7.16 / 20H392 IPSW of the iPhone X; member sha256 pins computed from the local archive and cross-checked against lonzzi/UniXNU-houji's published pins (all four agree).",
+  "Kernelcache: kernelcache.release.iphone10b, decompressed arm64 slice sha256 2ec297ba..., which the prelink step pins.",
+  "Prelink roots: 31 kext bundle identifiers, each checked to exist in the __PRELINK_INFO of this exact 20H392 kernelcache.",
+  "Payload: kernel.macho plus kernel.macho.adt in a 64 MiB FAT volume, booted by DarwinBoot from the firmware.",
+]
+configuration = [
+  "[ipsw] product iPhone10,3, version 16.7.16, build 20H392, device_class d22ap, chip_id 0x8015, board_id 0x06.",
+  "[ipsw.sha256] pins kernelcache.release.iphone10b, DeviceTree.d22ap.im4p and the two trust caches.",
+  "[kernel.prelink] kernelcache_sha256 = 2ec297bac95bcba01046fd0148e97e7e588c05a6c18827f39f534ba375c1221, slide = -0x1000000, no early_security_init.",
+  "[payload] volume RUYIESP, 64 MiB, dram_size 0x240000000, panic_screen false.",
+  "kernel_args: -v serial=3 debug=0x14e cpus=8 ruyifb_noconsole=1 ruyifb_hz=30 keepsyms=1 -noprogress wdt=-1 unentitled_ios_sim_launch=1 ignition_level=1 launchd_unsecure_cache=1 rootrw=1 rd=md0.",
+]
+procedure = [
+  "Fetch the IPSW members and check every member against its pin.",
+  "Build the kernel, prelink it against the pinned kernelcache, generate the ADT, and assemble the payload and boot image.",
+  "Inspect the boot image report: kernel and ADT hashes, the dram size, and the presence of the display_reserved alias in the firmware DTB.",
+]
+findings = [
+  "The 20H392 kernelcache decompresses to a fat Mach-O; only the arm64 slice is pinned, because the prelink compares the slice the kernel is built against, not the compressed container.",
+  "Every prelink root must exist in the target kernelcache or the prelink aborts on a missing dependency. The list was therefore checked identifier by identifier against this build's __PRELINK_INFO rather than inherited from another iOS version.",
+  "The iPadOS 17.7.11 profile's kernelcache sha256 (f18b4df8...) is a different Apple build and cannot be reused; using it would fail the prelink pin, which is the intended guard.",
+]
+completion = [
+  "The payload and boot image build reproducibly from the pinned IPSW, and the report shows the expected kernel, ADT and dram values.",
+]
+limits = [
+  "The kernel and payload have not been built from this repository on this machine: the kernel step needs the UniXNU Linux toolchain or a macOS host with Xcode, and neither is available here.",
+  "No boot image or payload artifact is published, because they embed Apple-derived binaries.",
+]
+next_action = [
+  "Build the kernel on a macOS runner with the pinned 20H392 inputs and record the resulting kernel.macho hash and the prelink report.",
+]
+evidence = [
+  { kind = "host", reference = "https://github.com/ehunshuaige/slop/blob/main/.github/workflows/ruyi-root.yml", command = "python3 notes/ipsw/hash_all.py", revision = "04b4e558bcded5213c2d802984862dc062f28257", result = "All 91 IPSW members hashed; the four pinned members match the pins, and those pins agree with lonzzi/UniXNU-houji's published values." },
+  { kind = "host", reference = "https://github.com/UniXNU/XnuPrelink/blob/f876e3ee62e18fc06653dd75ed7dafcfb3950ac0/native_prelink.py", command = "python3 - (parse __PRELINK_INFO of the extracted 20H392 kernelcache)", revision = "04b4e558bcded5213c2d802984862dc062f28257", result = "All 31 prelink roots exist in this kernelcache; the kernelcache's Darwin version is 22.6.0 and its build tag xnu-8796.141.3." },
+  { kind = "source", reference = "board.toml", result = "IPSW pins, prelink pins, payload inputs and kernel arguments." },
+]
+
+[[area]]
+id = "diagnostics"
+status = "planned"
+components = []
+paths = ["docs/evidence/**", "scripts/check-ruyi.py"]
+inputs = [
+  "Kernel console: this board has no accessible debug UART in this profile, so the kernel must draw its console into the scanout buffer the firmware hands over.",
+  "Persistent log: not implemented in this profile.",
+]
+configuration = [
+  "Kernel arguments keep the early console visible: -v serial=3 debug=0x14e keepsyms=1 -noprogress, with ruyifb_noconsole=1 once userland owns the display.",
+  "panic_screen is false: the panic renderer's offsets are specific to one kernel layout and the ruyi kernel has not been qualified against it.",
+]
+procedure = [
+  "Read the console from the internal panel; for a failed boot, photograph the last visible stage and record which checkpoint was reached.",
+]
+findings = [
+  "Without a usable serial port the panel is the only console, so the display path and the diagnostics path are the same path: nothing can be diagnosed until a frame reaches the panel. That makes the display area's ABI audit the first diagnostic prerequisite, not a later nicety.",
+  "The panic screen is left off rather than pointed at unqualified offsets: a panic renderer with wrong addresses turns a diagnosable panic into a hang.",
+]
+completion = [
+  "The last confirmed boot stage is readable from the device for every failure that reaches the display.",
+]
+limits = [
+  "No persistent log ring, no serial console and no panic renderer in this profile. A panic before the display is initialized is not recoverable from the device.",
+]
+next_action = [
+  "Add a persistent log ring backed by a reserved region once a storage or RAM reservation is chosen, and qualify the panic screen against a known kernel layout.",
+]
+evidence = [
+  { kind = "source", reference = "board.toml", result = "Console-oriented kernel arguments and panic_screen = false." },
+]
