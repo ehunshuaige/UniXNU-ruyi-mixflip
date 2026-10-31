@@ -280,6 +280,7 @@ next_action = [
 evidence = [
   { kind = "source", reference = "docs/evidence/RUYI-FDT-FACTS.md", result = "Internal panel node with 0x4c8 x 0xb60 (1224 x 2912) over 22 timing entries, and the 0xfc400000 + 0x2b00000 scanout reservation, both from the live ruyi FDT." },
   { kind = "source", reference = "board.toml", result = "GopFramebuffer is the only display component; no GPU component is selected." },
+  { kind = "source", reference = "docs/evidence/DISPLAY-FIELD-OFFSETS-20H392.md", result = "Preliminary private field layout for the iOS 16 object: 0x1458 and 0x145c are two adjacent uint32 fields with dedicated getters and a joint copy-out routine, which is the shape of the framebuffer width and height; the pending swap queue is not located yet. The iPadOS offsets cannot be reused: the object is 0x1660 here against 0x18a0 there." },
   { kind = "host", reference = "drivers/RuyiDisplay/mobile-graphics-legacy-abi.json", command = "python3 scripts/build-gop-legacy-display.py --kernelcache <20H392 arm64 slice>", revision = "04b4e558bcded5213c2d802984862dc062f28257", result = "The committed iOS 16 display ABI audit verifies against the pinned kernelcache: Legacy vtable 338 entries, nine abstract slots, C2 constructor located; the builder then stops with the two remaining inputs." },
 ]
 

@@ -63,9 +63,12 @@ The record distinguishes `planned`, `implemented`, `host-verified` and
 - `device-verified` needs a ruyi device observation identifying the firmware and
   image.
 
-Nothing here is `device-verified`. In particular the display driver's ABI was
-audited against a **different** kernelcache (iPadOS 17.7.11); see the display
-area's findings before building it for this profile.
+Nothing here is `device-verified`. The display ABI **has** been audited from the
+pinned 20H392 kernelcache itself (`drivers/RuyiDisplay/mobile-graphics-legacy-abi.json`),
+so the vtable, abstract slots and instance size are this binary's. The private
+*field offsets* the driver also needs are only partly derived — see
+`docs/evidence/DISPLAY-FIELD-OFFSETS-20H392.md` before writing the display
+backend.
 
 ## Work
 
@@ -86,11 +89,13 @@ and hardware results separately.
 
 ## Open work, in order
 
-1. Re-run `scripts/audit-mobile-graphics-legacy.py` against a 20H392 prelink
-   candidate and record the resulting display ABI facts. Nothing in the display
-   path can be built before this.
+1. Finish the display driver: derive the remaining private field offsets
+   (the pending swap queue is not located yet), then write the nine backend
+   leaves and the original-bindings assembly. The vtable facts are done; see
+   `drivers/RuyiDisplay/mobile-graphics-legacy-abi.json`.
 2. Publish a ruyi Mu-Silicium checkout so the firmware step has a `--uefi` input.
 3. Build the kernel and payload on a macOS runner; record the prelink report.
+   `.github/workflows/kernel.yml` does this on dispatch.
 4. Boot with `cpus=1`, confirm the console and timer, then `cpus=8`.
 5. Only then attempt the desktop milestone, and record what actually appears.
 
