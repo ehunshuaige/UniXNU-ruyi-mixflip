@@ -211,6 +211,32 @@ jobs:
                         hashlib.sha256(path.read_bytes()).hexdigest(), path)
           PY
 
+      - name: Diagnose the kernel SDK header tree
+        if: always()
+        run: |
+          set +e
+          echo "## kernel SDK fakeroot"
+          tree_dir=$(find unixnu/out -maxdepth 5 -type d -name tree | head -1)
+          echo "tree: $tree_dir"
+          if [ -n "$tree_dir" ]; then
+            echo "--- refer/"
+            ls -la "$tree_dir/refer" 2>/dev/null | head -20
+            echo "--- refer/libdispatch (first entries)"
+            ls "$tree_dir/refer/libdispatch" 2>/dev/null | head -8
+            echo "--- refer/libdispatch/os"
+            ls "$tree_dir/refer/libdispatch/os" 2>/dev/null | head -25
+            echo "--- fakeroot/usr/local/include/os"
+            ls "$tree_dir/.cache/fakeroot/usr/local/include/os" 2>/dev/null | head -25
+            echo "--- count"
+            ls "$tree_dir/.cache/fakeroot/usr/local/include/os" 2>/dev/null | wc -l
+            echo "--- where firehose lives anywhere in the build"
+            find unixnu/out -name 'firehose_buffer_private.h' 2>/dev/null | head -5
+          fi
+          echo "--- feeds"
+          ls -d unixnu/out/feeds/* 2>/dev/null | head -20
+          echo "--- unifdef"
+          command -v unifdef || echo "unifdef MISSING"
+
       - name: Collect the text logs
         id: logs
         if: always()
