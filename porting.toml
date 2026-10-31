@@ -254,7 +254,8 @@ findings = [
   "The panel is 1224 x 2912 in its own scan orientation, i.e. 2912 x 1224 as the user sees it folded open; stride is 1224*4 = 4896 bytes. A GOP-reported stride is not a substitute: the value must be the one the panel and the scanout buffer actually use.",
   "The iOS 16.7.16 IOMobileGraphicsFamily is NOT the binary the earlier ruyi display bring-up audited. That bring-up device-verified a driver whose ABI facts were read from the iPadOS 17.7.11 kernelcache (executable sha256 2e044ee6...). The 20H392 kernelcache carries a different IOMobileGraphicsFamily (343.0.0, executable sha256 03e4c4d8...), so the vtable offsets, the nine abstract leaves and the object size in that audit do not apply and must not be reused. Re-running scripts/audit-mobile-graphics-legacy.py against a 20H392 prelink candidate is a prerequisite for building the display driver here.",
   "No GPU driver is selected, so the render server must fall back to CPU compositing. Whether iOS 16's backboardd takes that fallback without a Metal device is the open question this profile exists to answer; it is not established by this record.",
-  "The iOS 16 display ABI has now been audited from the pinned kernelcache itself: IOMobileGraphicsFamily 343.0.0, __TEXT_EXEC sha256 03e4c4d8..., Legacy vtable 0xfffffff006def8e0 with 338 virtual entries and nine abstract slots [211, 212, 242, 243, 292, 293, 321, 322, 329], C2 constructor 0xfffffff005c0bbc8, and newUserClient overridden at slot 141. The full method table is committed at drivers/RuyiDisplay/mobile-graphics-legacy-abi.json.",
+  "The iOS 16 display ABI has now been audited from the pinned kernelcache itself: IOMobileGraphicsFamily 343.0.0, __TEXT_EXEC sha256 03e4c4d8..., Legacy vtable 0xfffffff006def8e0 with 338 virtual entries and nine abstract slots [211, 212, 242, 243, 292, 293, 321, 322, 329], C2 constructor 0xfffffff005c0bbc8, instance size 0x1660, and newUserClient overridden at slot 141. The full method table is committed at drivers/RuyiDisplay/mobile-graphics-legacy-abi.json.",
+  "The instance size was derived statically, not from a live run: the derived-meta-class constructor at 0xfffffff005c0bc94 materialises the class-name string, the superclass meta class and MOVZ w3,#0x1660 before calling OSMetaClass::OSMetaClass, whose third argument is the size alloc() uses. The iPadOS 17 binary's size is 0x18a0.",
   "That audit also proves the iPadOS 17 facts were unusable: that binary has 358 entries and abstract slots [211, 213, 245, 246, 306, 307, 337, 338, 345]. Building from the old values would have dispatched through the wrong entries rather than failing to link.",
 ]
 completion = [
@@ -263,12 +264,12 @@ completion = [
 ]
 limits = [
   "Nothing in this area is device-verified from this repository.",
-  "The display archive still cannot be built: the Legacy object size (instance_bytes) is not derivable from the kernelcache and must be read from a live prelink run, and the backend leaf implementations plus the original-bindings assembly are not written yet. scripts/build-gop-legacy-display.py validates the committed audit against the pinned kernelcache and then stops with that list.",
+  "The display archive still cannot be built: the nine backend leaf implementations for the abstract slots and the original-bindings assembly are not written yet. All the address and layout facts they need are now in drivers/RuyiDisplay/mobile-graphics-legacy-abi.json, so no live run is required to obtain them. scripts/build-gop-legacy-display.py validates the committed audit against the pinned kernelcache and then stops with that list.",
   "Backlight, display power and the panel's DSI bring-up are not implemented. The firmware leaves the panel scanning out; this profile only copies frames into the buffer it hands over.",
   "The presentation rate (ruyifb_hz=30) is a policy value and says nothing about the panel's real refresh rate or about sustained frame rate.",
 ]
 next_action = [
-  "Obtain the Legacy object size from a live prelink run of this kernelcache, then implement the nine backend leaves and the original-bindings assembly using drivers/RuyiDisplay/mobile-graphics-legacy-abi.json as the address source.",
+  "Implement the nine backend leaves and the original-bindings assembly using drivers/RuyiDisplay/mobile-graphics-legacy-abi.json as the sole address source.",
 ]
 evidence = [
   { kind = "source", reference = "docs/evidence/RUYI-FDT-FACTS.md", result = "Internal panel node with 0x4c8 x 0xb60 (1224 x 2912) over 22 timing entries, and the 0xfc400000 + 0x2b00000 scanout reservation, both from the live ruyi FDT." },

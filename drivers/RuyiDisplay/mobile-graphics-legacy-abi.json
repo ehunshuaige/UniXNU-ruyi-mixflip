@@ -27,11 +27,12 @@
     ],
     "constructor_va": "0xfffffff005c0bbc8",
     "constructor_stores_vtable": true,
-    "instance_bytes": null,
-    "instance_bytes_note": "Not derivable from the kernelcache: no site allocates the object with a compile-time size visible in the family text (no direct operator-new call in the kext; the factory lives outside it or the allocation is inlined). Must be read from a live prelink run before the driver is built. The iPadOS 17 audit recorded 0x18a0; that value belongs to a different binary and must not be assumed here.",
+    "instance_bytes": 5728,
+    "instance_bytes_note": "iOS 16.7.16: 0x1660. The iPadOS 17.7.11 audit recorded 0x18a0 for a different binary of the same kext; the values must not be interchanged.",
     "constructor_kind": "C2 (base-object) constructor",
     "constructor_calls_parent": "0xfffffff005c0186c",
-    "constructor_note": "Disassembled: adrp/add/add materialises the vtable, spilling it to the stack, then BL 0xfffffff005c0186c (the Service base ctor), then str x8,[x0] stores the Legacy vtable as the object vptr. Only one site in the whole prelinked kernel loads this vtable address."
+    "constructor_note": "Disassembled: adrp/add/add materialises the vtable, spilling it to the stack, then BL 0xfffffff005c0186c (the Service base ctor), then str x8,[x0] stores the Legacy vtable as the object vptr. Only one site in the whole prelinked kernel loads this vtable address.",
+    "instance_bytes_derivation": "Statically derived from the derived-meta-class constructor at 0xfffffff005c0bc94, which materialises the class-name string \"IOMobileFramebufferLegacy\" into x1, the superclass gMetaClass (0xfffffff007a41000, inside this kext'__DATA) into x2, and loads MOVZ w3,#0x1660 before calling OSMetaClass::OSMetaClass at 0xfffffff005c26e0c. OSMetaClass stores that third argument as the instance size used by alloc()."
   },
   "parents": {
     "base_fn0": "0xfffffff006deed60",
@@ -1753,5 +1754,13 @@
       "address": "0xfffffff005c24c80",
       "abstract": false
     }
-  ]
+  ],
+  "meta_class_construction": {
+    "site": "0xfffffff005c0bc94",
+    "class_name_va": "0xfffffff004f6564a",
+    "superclass_meta_class": "0xfffffff007a41000",
+    "instance_size": "0x1660",
+    "osmetaclass_ctor": "0xfffffff005c26e0c",
+    "ipados17_instance_size": "0x18a0"
+  }
 }

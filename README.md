@@ -61,15 +61,19 @@ That audit has now been redone from the pinned kernelcache and is committed as
 | virtual entries | **338** | 358 |
 | abstract slots | `[211, 212, 242, 243, 292, 293, 321, 322, 329]` | `[211, 213, 245, 246, 306, 307, 337, 338, 345]` |
 | C2 constructor | `0xfffffff005c0bbc8` | - |
+| instance size | **0x1660** | 0x18a0 |
 
 The two binaries differ in both slot count and abstract set, which is exactly why
 the old audit could not be reused: a driver built from it would link and then
 dispatch through the wrong entries.
 
-The archive still cannot be built, for two concrete reasons recorded in the
-JSON: the Legacy **object size** is not derivable from the kernelcache and must
-come from a live prelink run, and the nine **backend leaf implementations** plus
-the original-bindings assembly are not written yet.
+The instance size is derived statically rather than from a live run: the
+derived-meta-class constructor at `0xfffffff005c0bc94` passes the class-name
+string, the superclass meta class and `MOVZ w3,#0x1660` to
+`OSMetaClass::OSMetaClass`, and that third argument is the size `alloc()` uses.
+
+The archive still cannot be built: the nine **backend leaf implementations** for
+the abstract slots above and the original-bindings assembly are not written yet.
 `scripts/build-gop-legacy-display.py` verifies the committed audit against the
 pinned kernelcache and then stops with that list.
 
