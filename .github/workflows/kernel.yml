@@ -124,8 +124,16 @@ jobs:
           xcodebuild -version 2>/dev/null | head -n 1 || true
           xcrun --sdk iphoneos --show-sdk-version || true
           python3 --version
+          # The payload step links the panic screen with ld.lld and builds the
+          # FAT volume with mtools; a kernel-only run neither installs nor needs
+          # them, so requiring them here would fail the job and skip everything
+          # after it.
+          required="git make clang cmake ninja unifdef dtc"
+          case "$STEPS" in
+            *payload*) required="$required ld.lld mformat mcopy" ;;
+          esac
           missing=0
-          for tool in git make clang cmake ninja unifdef ld.lld mformat mcopy dtc; do
+          for tool in $required; do
             path=$(command -v "$tool" || true)
             printf '%-10s %s\n' "$tool" "${path:-MISSING}"
             [ -n "$path" ] || missing=1
