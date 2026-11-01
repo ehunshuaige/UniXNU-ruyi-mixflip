@@ -60,16 +60,21 @@ enable-nos-arm-asm.patch
 gate-apple-amcc.patch
 
 # osfmk/arm/pmap/pmap.c includes <arm64/ppl/sart.h> and <arm64/ppl/uat.h> and
-# calls sart_bootstrap() and uat_bootstrap() unconditionally. Those belong to
-# Apple's protected page layer, which Apple publishes nowhere: not in the source
-# trees (neither 8796 nor 10063 has osfmk/arm64/ppl), not in the Xcode SDK, and
-# not in a Kernel Development Kit (a KDK carries debug symbols and prebuilt
-# libraries for an existing kernel, not headers). No device repository carries
-# them either.
+# calls sart_bootstrap(), uat_bootstrap(), ptep_get_iommu() and the
+# pmap_ppl_lockdown/unlockdown pair. All of that belongs to Apple's protected
+# page layer, which Apple publishes nowhere: not in the source trees (neither
+# 8796 nor 10063 has osfmk/arm64/ppl), not in the Xcode SDK, not in a Kernel
+# Development Kit, and not in any device repository.
 #
-# The two symbols are the entire surface pmap.c needs from them, so this
-# provides headers with no-op bootstraps. The kernel therefore runs without the
-# protected page layer, which the porting record states as a limit: this is a
-# non-Apple platform with no PPL monitor to hand page tables to, so the layer
-# could not function here regardless.
-ppl-bootstrap-stub.patch
+# Rather than fake the headers, this guards the dependency out for a platform
+# that has no PPL monitor: the two includes and their bootstrap calls sit behind
+# XNU_MONITOR_ANS2_SART / XNU_MONITOR_UAT_PPL, the code-signing lockdown pair
+# sits behind PMAP_CS_PPL_MONITOR || PMAP_CS_INCLUDE_CODE_SIGNING, ptep_get_iommu
+# is replaced by the page-table entry it formats, and pmap_phys_write_disable
+# gets the forward declaration its call site needs. This is the shared UniXNU
+# non-Apple IOMMU bootstrap patch, carried device-locally; it applies unchanged
+# to xnu-8796.
+#
+# The kernel therefore builds without the protected page layer, which the
+# porting record states as a limit.
+non-apple-iommu-bootstrap.patch
