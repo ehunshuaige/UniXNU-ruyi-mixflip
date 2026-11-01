@@ -78,3 +78,12 @@ gate-apple-amcc.patch
 # The kernel therefore builds without the protected page layer, which the
 # porting record states as a limit.
 non-apple-iommu-bootstrap.patch
+
+# start.s includes <arm64/tunables/tunables.s> and applies per-SoC CPU tunables
+# read from MIDR_EL1. The tunables tree is Apple's: it is generated per Apple
+# SoC and is not part of the open source release (osfmk/arm64/tunables does not
+# exist in either 8796 or 10063). The shared apple-only-cpu-tunables patch guards
+# both behind APPLE_ARM64_ARCH_FAMILY, which is exactly right, but its context
+# does not match this version - 8796 has an extra #include "assym.s" and a
+# different HAS_CLUSTER guard - so this is the same guard adapted to 8796.
+apple-only-cpu-tunables-8796.patch
