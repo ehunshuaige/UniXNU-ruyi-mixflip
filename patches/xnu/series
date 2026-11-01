@@ -50,3 +50,11 @@ rename-pmap-non-pac-padding.patch
 # then comes up undefined at link. Newer XNU and the shared UniXNU machine-layer
 # patch both enable them here.
 enable-nos-arm-asm.patch
+
+# Enabling nos_arm_asm also makes osfmk/conf/files.arm64 ask for
+# osfmk/arm64/amcc_rorgn_ppl.c and amcc_rorgn_common.c, Apple's memory cache
+# controller sources. xnu-8796 ships only amcc_rorgn.h - both .c files are gone
+# from this version - so the build fails on sources it cannot find. Gating them
+# behind an apple_amcc option that no config enables keeps them out of a
+# non-Apple kernel, which is what the shared UniXNU machine-layer patch does.
+gate-apple-amcc.patch
