@@ -281,6 +281,33 @@ jobs:
           done
           ls "$sdk/usr/local/include/kernel/os" | head -8
 
+          # The KDK installed earlier carries what no public source tree does:
+          # arm64/ppl/sart.h, arm64/ppl/uat.h and the rest of the protected page
+          # layer that osfmk/arm/pmap/pmap.c includes unconditionally. XNU only
+          # adds -I$(SDKROOT)/usr/local/include/kernel, so merge the KDK's kernel
+          # include tree into the SDK where that flag points.
+          kdk_inc=$(find /Library/Developer/KDKs -type d -path '*/usr/local/include/kernel' 2>/dev/null | head -1)
+          if [ -n "$kdk_inc" ]; then
+            echo "merging $kdk_inc into the SDK"
+            sudo mkdir -p "$sdk/usr/local/include/kernel"
+            sudo cp -R "$kdk_inc/." "$sdk/usr/local/include/kernel/"
+          else
+            # Fall back to the framework layout some KDKs use.
+            kdk_priv=$(find /Library/Developer/KDKs -type d -path '*/Kernel.framework/Versions/A/PrivateHeaders' 2>/dev/null | head -1)
+            if [ -n "$kdk_priv" ]; then
+              echo "merging $kdk_priv into the SDK kernel include tree"
+              sudo mkdir -p "$sdk/usr/local/include/kernel"
+              sudo cp -R "$kdk_priv/." "$sdk/usr/local/include/kernel/"
+            fi
+          fi
+          if [ -f "$sdk/usr/local/include/kernel/arm64/ppl/sart.h" ]; then
+            echo "ppl headers in place"
+          else
+            echo "::error::arm64/ppl/sart.h is still not on the include path"
+            find /Library/Developer/KDKs -name 'sart.h' 2>/dev/null | head -5 || true
+            exit 1
+          fi
+
           # The same gap breaks the link step: the driver builds
           # libfirehose_kernel.a into .cache/fakeroot/usr/local/lib/kernel
           # (scripts/build-firehose.sh), and the linker searches
