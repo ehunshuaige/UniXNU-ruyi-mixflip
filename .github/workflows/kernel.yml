@@ -244,16 +244,26 @@ jobs:
           fi
           echo "--- installed KDKs"
           ls -la /Library/Developer/KDKs || true
+          echo "--- KDK layout"
+          find -L /Library/Developer/KDKs -maxdepth 6 -type d 2>/dev/null | head -25
+          echo "--- any sart.h anywhere (following symlinks)"
+          find -L /Library/Developer/KDKs -name 'sart.h' 2>/dev/null | head -10
           echo "--- ppl headers found"
-          find /Library/Developer/KDKs -path '*arm64/ppl*' -name '*.h' 2>/dev/null | head -10
+          find -L /Library/Developer/KDKs -path '*ppl*' -name '*.h' 2>/dev/null | head -15
           echo "--- os / firehose headers found"
-          find /Library/Developer/KDKs -name 'firehose_buffer_private.h' 2>/dev/null | head -3
+          find -L /Library/Developer/KDKs -name 'firehose_buffer_private.h' 2>/dev/null | head -3
           # Fail here rather than 600 lines into a compile: without the PPL
           # headers no arm64 kernel links, and that is the whole point of the KDK.
-          if ! find /Library/Developer/KDKs -name 'sart.h' -path '*arm64/ppl*' 2>/dev/null | grep -q .; then
-            echo "::error::the KDK does not carry arm64/ppl/sart.h"
+          # -L matters: a KDK's PrivateHeaders is commonly a symlink into the
+          # Xcode toolchain, and plain find would report nothing while the
+          # headers are in fact readable.
+          sart=$(find -L /Library/Developer/KDKs -name 'sart.h' 2>/dev/null | head -1)
+          if [ -z "$sart" ]; then
+            echo "::error::the KDK does not carry sart.h"
             exit 1
           fi
+          echo "sart.h: $sart"
+          echo "ppl dir: $(dirname "$sart")"
 
       - name: Provide the kernel SDK os/ headers to the macOS SDK
         run: |
@@ -313,25 +323,26 @@ jobs:
           # layer that osfmk/arm/pmap/pmap.c includes unconditionally. XNU only
           # adds -I$(SDKROOT)/usr/local/include/kernel, so merge the KDK's kernel
           # include tree into the SDK where that flag points.
-          kdk_inc=$(find /Library/Developer/KDKs -type d -path '*/usr/local/include/kernel' 2>/dev/null | head -1)
+          kdk_inc=$(find -L /Library/Developer/KDKs -type d -path '*/usr/local/include/kernel' 2>/dev/null | head -1)
           if [ -n "$kdk_inc" ]; then
             echo "merging $kdk_inc into the SDK"
             sudo mkdir -p "$sdk/usr/local/include/kernel"
-            sudo cp -R "$kdk_inc/." "$sdk/usr/local/include/kernel/"
+            sudo cp -RL "$kdk_inc/." "$sdk/usr/local/include/kernel/"
           else
             # Fall back to the framework layout some KDKs use.
-            kdk_priv=$(find /Library/Developer/KDKs -type d -path '*/Kernel.framework/Versions/A/PrivateHeaders' 2>/dev/null | head -1)
+            kdk_priv=$(find -L /Library/Developer/KDKs -type d -path '*/Kernel.framework/Versions/A/PrivateHeaders' 2>/dev/null | head -1)
             if [ -n "$kdk_priv" ]; then
               echo "merging $kdk_priv into the SDK kernel include tree"
               sudo mkdir -p "$sdk/usr/local/include/kernel"
-              sudo cp -R "$kdk_priv/." "$sdk/usr/local/include/kernel/"
+              sudo cp -RL "$kdk_priv/." "$sdk/usr/local/include/kernel/"
             fi
           fi
           if [ -f "$sdk/usr/local/include/kernel/arm64/ppl/sart.h" ]; then
             echo "ppl headers in place"
           else
             echo "::error::arm64/ppl/sart.h is still not on the include path"
-            find /Library/Developer/KDKs -name 'sart.h' 2>/dev/null | head -5 || true
+            find -L /Library/Developer/KDKs -name 'sart.h' 2>/dev/null | head -5 || true
+            ls "$sdk/usr/local/include/kernel" | head -20 || true
             exit 1
           fi
 
