@@ -202,69 +202,6 @@ jobs:
           print('out             :', text(data.get('out')))
           PY
 
-      - name: Install a Kernel Development Kit
-        run: |
-          set -euo pipefail
-          # osfmk/arm/pmap/pmap.c includes <arm64/ppl/sart.h> and <arm64/ppl/uat.h>
-          # unconditionally. That is Apple's protected page layer, which
-          # apple-oss-distributions/xnu never publishes and which neither the
-          # Xcode iPhoneOS SDK nor this runner image carries. It ships in a
-          # Kernel Development Kit.
-          #
-          # ipsw reads Apple's public software catalog, so no Apple ID is
-          # involved. Every command reads from /dev/null and passes --clean: an
-          # earlier form of this step sat for fourteen minutes, most likely on
-          # the delete prompt ipsw offers after --install. macOS has no
-          # `timeout` (that is GNU coreutils), so the step cannot wrap these;
-          # --clean and </dev/null are what keep it non-interactive.
-          if [ -z "$(ls -A /Library/Developer/KDKs 2>/dev/null || true)" ]; then
-            # The prebuilt release, not the Homebrew formula: there is no bottle
-            # for this macOS image, so `brew install blacktop/tap/ipsw` starts a
-            # full Go build and the step ran past fifteen minutes before it was
-            # cancelled. The release tarball is 27 MiB and needs nothing.
-            echo "fetching ipsw"
-            # The asset name carries the version (ipsw_3.1.741_macOS_arm64.tar.gz),
-            # so releases/latest/download/<name> cannot address it - that 404s.
-            # Ask the release API which URL is current.
-            url=$(curl -fsSL -H 'Accept: application/vnd.github+json' \
-                    https://api.github.com/repos/blacktop/ipsw/releases/latest \
-                  | jq -r '[.assets[] | select(.name | test("^ipsw_[0-9.]+_macOS_arm64[.]tar[.]gz$")) | .browser_download_url][0] // empty')
-            if [ -z "$url" ]; then
-              echo "::error::no macOS arm64 ipsw asset in the latest release"
-              exit 1
-            fi
-            echo "asset: $url"
-            curl -fsSL --retry 3 -o "$RUNNER_TEMP/ipsw.tar.gz" "$url"
-            tar -xzf "$RUNNER_TEMP/ipsw.tar.gz" -C "$RUNNER_TEMP"
-            chmod +x "$RUNNER_TEMP/ipsw"
-            sudo install -m 755 "$RUNNER_TEMP/ipsw" /usr/local/bin/ipsw
-            ipsw version </dev/null || true
-            echo "downloading and installing the host KDK"
-            sudo ipsw download kdk --host --install --clean </dev/null
-          fi
-          echo "--- installed KDKs"
-          ls -la /Library/Developer/KDKs || true
-          echo "--- KDK layout"
-          find -L /Library/Developer/KDKs -maxdepth 6 -type d 2>/dev/null | head -25
-          echo "--- any sart.h anywhere (following symlinks)"
-          find -L /Library/Developer/KDKs -name 'sart.h' 2>/dev/null | head -10
-          echo "--- ppl headers found"
-          find -L /Library/Developer/KDKs -path '*ppl*' -name '*.h' 2>/dev/null | head -15
-          echo "--- os / firehose headers found"
-          find -L /Library/Developer/KDKs -name 'firehose_buffer_private.h' 2>/dev/null | head -3
-          # Fail here rather than 600 lines into a compile: without the PPL
-          # headers no arm64 kernel links, and that is the whole point of the KDK.
-          # -L matters: a KDK's PrivateHeaders is commonly a symlink into the
-          # Xcode toolchain, and plain find would report nothing while the
-          # headers are in fact readable.
-          sart=$(find -L /Library/Developer/KDKs -name 'sart.h' 2>/dev/null | head -1)
-          if [ -z "$sart" ]; then
-            echo "::error::the KDK does not carry sart.h"
-            exit 1
-          fi
-          echo "sart.h: $sart"
-          echo "ppl dir: $(dirname "$sart")"
-
       - name: Provide the kernel SDK os/ headers to the macOS SDK
         run: |
           set -euo pipefail
@@ -318,46 +255,10 @@ jobs:
           done
           ls "$sdk/usr/local/include/kernel/os" | head -8
 
-          # The KDK installed earlier carries what no public source tree does:
-          # arm64/ppl/sart.h, arm64/ppl/uat.h and the rest of the protected page
-          # layer that osfmk/arm/pmap/pmap.c includes unconditionally. XNU only
-          # adds -I$(SDKROOT)/usr/local/include/kernel, so merge the KDK's kernel
-          # include tree into the SDK where that flag points.
-          kdk_inc=$(find -L /Library/Developer/KDKs -type d -path '*/usr/local/include/kernel' 2>/dev/null | head -1)
-          if [ -n "$kdk_inc" ]; then
-            echo "merging $kdk_inc into the SDK"
-            sudo mkdir -p "$sdk/usr/local/include/kernel"
-            sudo cp -RL "$kdk_inc/." "$sdk/usr/local/include/kernel/"
-          else
-            # Fall back to the framework layout some KDKs use.
-            kdk_priv=$(find -L /Library/Developer/KDKs -type d -path '*/Kernel.framework/Versions/A/PrivateHeaders' 2>/dev/null | head -1)
-            if [ -n "$kdk_priv" ]; then
-              echo "merging $kdk_priv into the SDK kernel include tree"
-              sudo mkdir -p "$sdk/usr/local/include/kernel"
-              sudo cp -RL "$kdk_priv/." "$sdk/usr/local/include/kernel/"
-            fi
-          fi
-          if [ -f "$sdk/usr/local/include/kernel/arm64/ppl/sart.h" ]; then
-            echo "ppl headers in place"
-          else
-            echo "::error::arm64/ppl/sart.h is still not on the include path"
-            find -L /Library/Developer/KDKs -name 'sart.h' 2>/dev/null | head -5 || true
-            ls "$sdk/usr/local/include/kernel" | head -20 || true
-            exit 1
-          fi
-
-          # The same gap breaks the link step: the driver builds
-          # libfirehose_kernel.a into .cache/fakeroot/usr/local/lib/kernel
-          # (scripts/build-firehose.sh), and the linker searches
-          # -L$(SDKROOT)/usr/local/lib/kernel. Point the SDK path at the
-          # fakeroot directory the build will fill. It does not exist yet, so the
-          # link is created dangling on purpose and becomes live when
-          # build-firehose.sh installs the archive.
-          work=$(./unixnu status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["output"])')
-          echo "work: $work"
-          sudo mkdir -p "$sdk/usr/local/lib"
-          sudo ln -sfn "$work/tree/.cache/fakeroot/usr/local/lib/kernel" "$sdk/usr/local/lib/kernel"
-          ls -l "$sdk/usr/local/lib/kernel"
+          # arm64/ppl/sart.h and uat.h are not provided from outside the tree:
+          # Apple publishes them nowhere, so patches/xnu/ppl-bootstrap-stub.patch
+          # adds them under osfmk/arm64/ppl and the osfmk component finds them
+          # through its own include directory.
 
       - name: Build kernel
         working-directory: unixnu

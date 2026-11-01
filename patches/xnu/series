@@ -58,3 +58,18 @@ enable-nos-arm-asm.patch
 # behind an apple_amcc option that no config enables keeps them out of a
 # non-Apple kernel, which is what the shared UniXNU machine-layer patch does.
 gate-apple-amcc.patch
+
+# osfmk/arm/pmap/pmap.c includes <arm64/ppl/sart.h> and <arm64/ppl/uat.h> and
+# calls sart_bootstrap() and uat_bootstrap() unconditionally. Those belong to
+# Apple's protected page layer, which Apple publishes nowhere: not in the source
+# trees (neither 8796 nor 10063 has osfmk/arm64/ppl), not in the Xcode SDK, and
+# not in a Kernel Development Kit (a KDK carries debug symbols and prebuilt
+# libraries for an existing kernel, not headers). No device repository carries
+# them either.
+#
+# The two symbols are the entire surface pmap.c needs from them, so this
+# provides headers with no-op bootstraps. The kernel therefore runs without the
+# protected page layer, which the porting record states as a limit: this is a
+# non-Apple platform with no PPL monitor to hand page tables to, so the layer
+# could not function here regardless.
+ppl-bootstrap-stub.patch

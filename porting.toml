@@ -41,6 +41,7 @@ procedure = [
   "Run python3 scripts/porting-record.py check --device ../UniXNU-ruyi.",
 ]
 findings = [
+  "Apple's protected page layer is stubbed, and the KDK route is closed. patches/xnu/ppl-bootstrap-stub.patch adds osfmk/arm64/ppl/sart.h and uat.h with no-op sart_bootstrap()/uat_bootstrap(), the only two symbols pmap.c takes from them; the KDK step is gone from the workflow because a KDK carries debug symbols and prebuilt libraries for an existing kernel, never headers. The series is now eight patches, all verified to apply in order to the pinned xnu-8796.141.3.",
   "Format 2 merges tables in arch, SoC, OS, device order and replaces ordinary arrays. There is no UniXNU-sm8650-common repository, so board.soc_source names a board-local slice (feeds.toml kind = soc, local = soc/sm8650), the same arrangement kerrinz/UniXNU-zorn uses. The slice holds SoC resources; board wiring, reservations and the panel stay in dts/ruyi.dts.",
   "The iOS 16 OS profile needed its own kernel config fragment: [kernel] config_fragments referenced os:configs/ipados.config, which exists only in the iPadOS profile. A missing fragment aborts defconfig assembly, and scripts/check-defconfig.py caught it. The profile now carries configs/ios.config.",
   "kernel.patch_series selects only device:patches/xnu/series. The shared arch/soc/os series in this snapshot are written against xnu-10063.141.1 while this port runs xnu-8796, so referencing them would apply hunks to the wrong source; both working SM8650 iOS-16 ports use the single-series form.",
@@ -71,6 +72,7 @@ completion = [
   "The porting record checker reports no identity, coverage or evidence errors.",
 ]
 limits = [
+  "The kernel runs without Apple's protected page layer. osfmk/arm/pmap/pmap.c needs <arm64/ppl/sart.h> and <arm64/ppl/uat.h>, which Apple publishes nowhere - not in the source trees, not in the Xcode SDK, not in a Kernel Development Kit, and not in any device repository - so patches/xnu/ppl-bootstrap-stub.patch supplies no-op bootstraps. PPL is Apple's mechanism for keeping page tables out of reach of the kernel; this kernel does not have it. That is a security posture this port does not claim, not a detail to gloss over.",
   "The SoC layer is a board-local slice (soc/sm8650/, feeds.toml local source), not a shared repository: no UniXNU-sm8650-common exists in the UniXNU organisation. kerrinz/UniXNU-zorn uses the same arrangement for this SoC. This is a deliberate temporary state, not the target architecture.",
   "Local build overrides can select different sources from the published pins; any verification must record the effective source.",
   "The shared arch/soc/os patch series in this UniXNU snapshot target xnu-10063.141.1 while this port runs xnu-8796, so board.toml selects only the device series. Patch applicability against xnu-8796 was not re-tested here (no macOS host or xnu-8796 checkout was available); the one-series form is what kerrinz/UniXNU-zorn and Asultop/UniXNU-NX769J use for the same reason.",

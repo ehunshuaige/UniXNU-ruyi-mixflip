@@ -1,0 +1,56 @@
+diff --git a/osfmk/arm64/ppl/sart.h b/osfmk/arm64/ppl/sart.h
+new file mode 100644
+index 0000000..5d42ded
+--- /dev/null
++++ b/osfmk/arm64/ppl/sart.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (c) 2026 UniXNU contributors. All rights reserved.
++ *
++ * Stand-in for Apple's Secure Address Translation (SART) interface, which is
++ * part of the protected page layer and is not published in any Apple open
++ * source release.
++ *
++ * osfmk/arm/pmap/pmap.c includes this header and calls sart_bootstrap()
++ * unconditionally. Nothing else in the tree refers to SART.
++ *
++ * This kernel does not run the protected page layer: it targets a
++ * non-Apple arm64 platform (Qualcomm SM8650) that has no Apple PPL monitor to
++ * hand page tables to. sart_bootstrap() is therefore a no-op, and the port's
++ * record states that PPL is not enabled. Do not read this file as an
++ * implementation of Apple's security architecture.
++ */
++#ifndef _ARM64_PPL_SART_H_
++#define _ARM64_PPL_SART_H_
++
++static inline void
++sart_bootstrap(void)
++{
++}
++
++#endif /* _ARM64_PPL_SART_H_ */
+diff --git a/osfmk/arm64/ppl/uat.h b/osfmk/arm64/ppl/uat.h
+new file mode 100644
+index 0000000..e613e5f
+--- /dev/null
++++ b/osfmk/arm64/ppl/uat.h
+@@ -0,0 +1,19 @@
++/*
++ * Copyright (c) 2026 UniXNU contributors. All rights reserved.
++ *
++ * Stand-in for Apple's Upper Address Translation (UAT) interface, part of the
++ * protected page layer and not published in any Apple open source release.
++ *
++ * osfmk/arm/pmap/pmap.c includes this header and calls uat_bootstrap()
++ * unconditionally. As with sart.h, the protected page layer is not enabled on
++ * this non-Apple platform, so the bootstrap is a no-op.
++ */
++#ifndef _ARM64_PPL_UAT_H_
++#define _ARM64_PPL_UAT_H_
++
++static inline void
++uat_bootstrap(void)
++{
++}
++
++#endif /* _ARM64_PPL_UAT_H_ */
