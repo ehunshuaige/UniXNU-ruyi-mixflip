@@ -185,6 +185,36 @@ jobs:
           print('out             :', text(data.get('out')))
           PY
 
+      - name: Install a Kernel Development Kit
+        run: |
+          set -euo pipefail
+          # osfmk/arm/pmap/pmap.c includes <arm64/ppl/sart.h> and <arm64/ppl/uat.h>
+          # unconditionally. That is Apple's protected page layer, which
+          # apple-oss-distributions/xnu never publishes and which neither the
+          # Xcode iPhoneOS SDK nor this runner image carries. It ships in a
+          # Kernel Development Kit.
+          #
+          # `ipsw download kdk` reads Apple's public software catalog, so no
+          # Apple ID is involved, and --install puts the KDK under
+          # /Library/Developer/KDKs.
+          if [ -z "$(ls -A /Library/Developer/KDKs 2>/dev/null || true)" ]; then
+            brew install blacktop/tap/ipsw
+            sudo ipsw download kdk --host --install
+          fi
+          echo "--- installed KDKs"
+          ls -la /Library/Developer/KDKs || true
+          echo "--- ppl headers found"
+          find /Library/Developer/KDKs -path '*arm64/ppl*' -name '*.h' 2>/dev/null | head -10
+          echo "--- firehose / os headers found"
+          find /Library/Developer/KDKs -name 'firehose_buffer_private.h' 2>/dev/null | head -3
+          # Fail here rather than 600 lines into a compile: without the PPL
+          # headers no arm64 kernel links, and that is the whole point of the
+          # KDK.
+          if ! find /Library/Developer/KDKs -name 'sart.h' -path '*arm64/ppl*' 2>/dev/null | grep -q .; then
+            echo "::error::the KDK does not carry arm64/ppl/sart.h"
+            exit 1
+          fi
+
       - name: Provide the kernel SDK os/ headers to the macOS SDK
         run: |
           set -euo pipefail
