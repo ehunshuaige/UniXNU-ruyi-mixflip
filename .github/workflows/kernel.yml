@@ -201,9 +201,17 @@ jobs:
           # `timeout` (that is GNU coreutils), so the step cannot wrap these;
           # --clean and </dev/null are what keep it non-interactive.
           if [ -z "$(ls -A /Library/Developer/KDKs 2>/dev/null || true)" ]; then
-            echo "installing ipsw"
-            brew install blacktop/tap/ipsw </dev/null
-            ipsw download kdk --help </dev/null | head -40 || true
+            # The prebuilt release, not the Homebrew formula: there is no bottle
+            # for this macOS image, so `brew install blacktop/tap/ipsw` starts a
+            # full Go build and the step ran past fifteen minutes before it was
+            # cancelled. The release tarball is 27 MiB and needs nothing.
+            echo "fetching ipsw"
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/ipsw.tar.gz" \
+              https://github.com/blacktop/ipsw/releases/latest/download/ipsw_macOS_arm64.tar.gz
+            tar -xzf "$RUNNER_TEMP/ipsw.tar.gz" -C "$RUNNER_TEMP"
+            chmod +x "$RUNNER_TEMP/ipsw"
+            sudo install -m 755 "$RUNNER_TEMP/ipsw" /usr/local/bin/ipsw
+            ipsw version </dev/null || true
             echo "downloading and installing the host KDK"
             sudo ipsw download kdk --host --install --clean </dev/null
           fi
