@@ -87,3 +87,10 @@ non-apple-iommu-bootstrap.patch
 # does not match this version - 8796 has an extra #include "assym.s" and a
 # different HAS_CLUSTER guard - so this is the same guard adapted to 8796.
 apple-only-cpu-tunables-8796.patch
+
+# Enabling nos_arm_asm also asks for osfmk/arm64/kpc.c, Apple's kernel
+# performance counters implementation, which this release does not ship (it does
+# exist in 10063). The kpc option is part of PERF_DBG_BASE in the bcm2837
+# configuration, so the entry is live here. Gating it behind apple_kpc, which no
+# configuration enables, keeps it out - the same shape as the amcc gate.
+gate-apple-kpc.patch
