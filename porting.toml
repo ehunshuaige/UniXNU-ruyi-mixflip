@@ -41,6 +41,7 @@ procedure = [
   "Run python3 scripts/porting-record.py check --device ../UniXNU-ruyi.",
 ]
 findings = [
+  "The jobs input has to stay unset when unused: the driver reads JOBS with int(os.environ.get('JOBS', 0)), so exporting an empty string from an empty workflow input raises ValueError before the build starts, and exporting 0 would reach make as -j0. The step exports JOBS only when the input has a value.",
   "Apple's protected page layer is stubbed, and the KDK route is closed. patches/xnu/ppl-bootstrap-stub.patch adds osfmk/arm64/ppl/sart.h and uat.h with no-op sart_bootstrap()/uat_bootstrap(), the only two symbols pmap.c takes from them; the KDK step is gone from the workflow because a KDK carries debug symbols and prebuilt libraries for an existing kernel, never headers. The series is now eight patches, all verified to apply in order to the pinned xnu-8796.141.3.",
   "Format 2 merges tables in arch, SoC, OS, device order and replaces ordinary arrays. There is no UniXNU-sm8650-common repository, so board.soc_source names a board-local slice (feeds.toml kind = soc, local = soc/sm8650), the same arrangement kerrinz/UniXNU-zorn uses. The slice holds SoC resources; board wiring, reservations and the panel stay in dts/ruyi.dts.",
   "The iOS 16 OS profile needed its own kernel config fragment: [kernel] config_fragments referenced os:configs/ipados.config, which exists only in the iPadOS profile. A missing fragment aborts defconfig assembly, and scripts/check-defconfig.py caught it. The profile now carries configs/ios.config.",
