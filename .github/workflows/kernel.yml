@@ -194,22 +194,25 @@ jobs:
           # Xcode iPhoneOS SDK nor this runner image carries. It ships in a
           # Kernel Development Kit.
           #
-          # `ipsw download kdk` reads Apple's public software catalog, so no
-          # Apple ID is involved, and --install puts the KDK under
-          # /Library/Developer/KDKs.
+          # ipsw reads Apple's public software catalog, so no Apple ID is
+          # involved. Every command is bounded and reads from /dev/null: an
+          # earlier form of this step sat for fourteen minutes, most likely on a
+          # prompt, and a detector is better than a timeout.
           if [ -z "$(ls -A /Library/Developer/KDKs 2>/dev/null || true)" ]; then
-            brew install blacktop/tap/ipsw
-            sudo ipsw download kdk --host --install
+            echo "installing ipsw"
+            timeout 900 brew install blacktop/tap/ipsw </dev/null
+            ipsw download kdk --help </dev/null | head -40 || true
+            echo "downloading and installing the host KDK"
+            sudo timeout 900 ipsw download kdk --host --install --clean </dev/null
           fi
           echo "--- installed KDKs"
           ls -la /Library/Developer/KDKs || true
           echo "--- ppl headers found"
           find /Library/Developer/KDKs -path '*arm64/ppl*' -name '*.h' 2>/dev/null | head -10
-          echo "--- firehose / os headers found"
+          echo "--- os / firehose headers found"
           find /Library/Developer/KDKs -name 'firehose_buffer_private.h' 2>/dev/null | head -3
           # Fail here rather than 600 lines into a compile: without the PPL
-          # headers no arm64 kernel links, and that is the whole point of the
-          # KDK.
+          # headers no arm64 kernel links, and that is the whole point of the KDK.
           if ! find /Library/Developer/KDKs -name 'sart.h' -path '*arm64/ppl*' 2>/dev/null | grep -q .; then
             echo "::error::the KDK does not carry arm64/ppl/sart.h"
             exit 1
