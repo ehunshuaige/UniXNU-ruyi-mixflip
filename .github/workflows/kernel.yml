@@ -38,6 +38,10 @@ on:
         description: IPSW URL (empty uses board.toml)
         required: false
         default: ""
+      jobs:
+        description: Parallel make jobs. Set to 1 for a serial build whose log is not interleaved (much slower, but the only way to read a failure inside a parallel component).
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -251,6 +255,7 @@ jobs:
         working-directory: unixnu
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          JOBS: ${{ inputs.jobs }}
         run: ./unixnu build kernel
 
       - name: Build payload
